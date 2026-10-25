@@ -876,6 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = normalizeCommandText(rawText);
         if (!text || textCommandInFlight) return false;
         let outcomeReported = false;
+        let failureReply = '';
         textCommandInFlight = true;
         ui.addConversationSegment('user', text);
         ui.updateAssistantSegment(t('command_state_processing'));
@@ -890,6 +891,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
             outcomeReported = true;
             if (!successful) {
+                // Keep the explanation (e.g. missing AI key) instead of a generic error.
+                failureReply = data?.ok === false ? String(data?.response || '') : '';
                 throw new Error(data.error || 'command_unavailable');
             }
             const reply = sanitizeJarvisReply(widgets.processResponse(data?.response || ''));
@@ -904,7 +907,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     detail: { outcome: '', ok: false }
                 }));
             }
-            ui.updateAssistantSegment(t('command_state_error'));
+            ui.updateAssistantSegment(failureReply || t('command_state_error'));
+            if (failureReply) setTranscript(failureReply);
             setCommandState('error');
             return false;
         } finally {
@@ -1951,6 +1955,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return data;
     }
 
+    // A missing AI key is a setup problem, not a crash: say exactly what to do.
+    function reasoningFailureReply(err) {
+        const detail = String(err?.message || '');
+        if (detail === 'llm_unconfigured' || detail.includes('GEMINI_API_KEY')) return t('cog_unconfigured_msg');
+        return t('cog_fail_msg');
+    }
+
     async function getLlamaResponses(userInput) {
         if (!ENABLE_STREAMING) {
             addLogEntry(t('cog_classic'));
@@ -1960,7 +1971,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return {
                     ok: false,
                     error: 'classic_unavailable',
-                    response: t('cog_fail_msg'),
+                    response: reasoningFailureReply(e),
                     should_listen: false,
                 };
             }
@@ -2050,7 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return {
                     ok: false,
                     error: 'reasoning_unavailable',
-                    response: t('cog_fail_msg'),
+                    response: reasoningFailureReply(e2),
                     should_listen: false,
                 };
             }

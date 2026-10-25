@@ -191,6 +191,12 @@ from langchain_core.tools import tool
 @tool
 def guardar_dato_memoria(dato: str) -> str:
     """Guarda un dato, preferencia o recuerdo en la memoria permanente del usuario para recordarlo siempre."""
+    from core.privacy import is_private_mode, looks_sensitive
+
+    if is_private_mode():
+        return "Private mode is on: nothing is saved to long-term memory."
+    if looks_sensitive(dato):
+        return "Not saved: that looks like a password, key, code or card number. JARVIS never stores secrets."
     clean_fact = _texto_limpio_memoria(dato).strip("- ")
     if not clean_fact:
         return "Dato de memoria vacío."
@@ -214,6 +220,98 @@ def guardar_dato_memoria(dato: str) -> str:
         pass
 
     return f"Dato guardado en la memoria permanente: '{clean_fact}'."
+
+
+def _fact_lines(pid: str) -> list[str]:
+    facts = _limpiar_facts_memoria(memory_manager.get_profile_data(pid).get("facts", ""))
+    return [ln[2:] if ln.startswith("- ") else ln for ln in facts.splitlines() if ln.strip()]
+
+
+def _store_fact_lines(pid: str, lines: list[str]) -> None:
+    memory_manager.set_facts(pid, "\n".join(f"- {ln}" for ln in lines))
+    guardar_memoria_perfiles()
+
+
+def _forget_cognitive_copy(pid: str, fact: str) -> None:
+    try:
+        from modules.memory.service import unified_memory
+
+        unified_memory.store.delete_cognitive_nodes_by_content(fact, pid)
+    except Exception:
+        pass
+
+
+def _resolve_fact_index(lines: list[str], ref: str) -> int | None:
+    ref = str(ref or "").strip()
+    if ref.isdigit():
+        index = int(ref) - 1
+        return index if 0 <= index < len(lines) else None
+    needle = _normalizar_ascii(ref)
+    matches = [i for i, ln in enumerate(lines) if needle and needle in _normalizar_ascii(ln)]
+    return matches[0] if len(matches) == 1 else None
+
+
+@tool
+def ver_memorias() -> str:
+    """List everything JARVIS has saved about the user in long-term memory, numbered.
+    Use for 'what do you remember about me', 'en pathi enna nyabagam vechirukka'."""
+    from core.privacy import is_private_mode
+
+    pid = _normalizar_profile_id(jarvis_state.get_active_profile_id())
+    lines = _fact_lines(pid)
+    mode = " Private mode is ON (nothing new is being saved)." if is_private_mode() else ""
+    if not lines:
+        return "No saved memories." + mode
+    body = "\n".join(f"{i}. {ln}" for i, ln in enumerate(lines, 1))
+    return f"Saved memories ({len(lines)}):\n{body}{mode}"
+
+
+@tool
+def editar_memoria(numero_o_texto: str, nuevo_texto: str) -> str:
+    """Replace one saved memory, chosen by its number from ver_memorias or a unique word in it."""
+    from core.privacy import is_private_mode, looks_sensitive
+
+    if is_private_mode():
+        return "Private mode is on: memory cannot be changed."
+    if looks_sensitive(nuevo_texto):
+        return "Not saved: that looks like a password, key, code or card number."
+    new_fact = _texto_limpio_memoria(nuevo_texto).strip("- ")
+    if not new_fact:
+        return "The new memory text is empty."
+    pid = _normalizar_profile_id(jarvis_state.get_active_profile_id())
+    lines = _fact_lines(pid)
+    index = _resolve_fact_index(lines, numero_o_texto)
+    if index is None:
+        return "I could not find exactly one memory matching that. Use the number from the memory list."
+    old = lines[index]
+    lines[index] = new_fact
+    _store_fact_lines(pid, lines)
+    _forget_cognitive_copy(pid, old)
+    return f"Memory updated: '{old}' -> '{new_fact}'."
+
+
+@tool
+def olvidar_memoria(numero_o_texto: str) -> str:
+    """Delete one saved memory (by number from ver_memorias or a unique word in it), including its copy
+    in the cognitive memory graph. Use for 'forget that', 'adha maranthudu'."""
+    pid = _normalizar_profile_id(jarvis_state.get_active_profile_id())
+    lines = _fact_lines(pid)
+    index = _resolve_fact_index(lines, numero_o_texto)
+    if index is None:
+        return "I could not find exactly one memory matching that. Use the number from the memory list."
+    removed = lines.pop(index)
+    _store_fact_lines(pid, lines)
+    _forget_cognitive_copy(pid, removed)
+    return f"Forgotten: '{removed}'."
+
+
+@tool
+def modo_privado(activar: bool) -> str:
+    """Turn private mode on or off. While on, JARVIS saves nothing new to long-term memory."""
+    from core.privacy import set_private_mode
+
+    enabled = set_private_mode(bool(activar))
+    return "Private mode ON: nothing new will be saved to memory." if enabled else "Private mode OFF: memory saving is allowed again."
 
 
 # ─────────────────────────────────────────
@@ -442,6 +540,10 @@ def _sincronizar_memoria_entrelazada(profile_id: str, user_input: str, ai_reply:
 
 
 def extraer_datos_criticos(input_text, last_facts):
+    from core.privacy import is_private_mode, looks_sensitive
+
+    if is_private_mode() or looks_sensitive(input_text):
+        return _limpiar_facts_memoria(last_facts)
     try:
         nuevos = _extraer_facts_de_input(input_text)
         return _fusionar_facts_memoria(last_facts, nuevos)

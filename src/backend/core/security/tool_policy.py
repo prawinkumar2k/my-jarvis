@@ -89,6 +89,11 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "renombrar_archivo": ToolPolicy("renombrar_archivo", "critical", ("admin",), True, True),
     "organizar_carpeta": ToolPolicy("organizar_carpeta", "critical", ("admin",), True, True),
     "eliminar_archivo": ToolPolicy("eliminar_archivo", "critical", ("admin",), True, True),
+    # Personal memory: owner-only; edits are audited.
+    "ver_memorias": ToolPolicy("ver_memorias", "elevated", ("admin",), False, True),
+    "editar_memoria": ToolPolicy("editar_memoria", "elevated", ("admin",), False, True),
+    "olvidar_memoria": ToolPolicy("olvidar_memoria", "elevated", ("admin",), False, True),
+    "modo_privado": ToolPolicy("modo_privado", "elevated", ("admin",), False, True),
 }
 
 

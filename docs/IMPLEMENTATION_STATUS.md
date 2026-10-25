@@ -21,6 +21,11 @@ Details per feature: [FEATURE_MATRIX.md](FEATURE_MATRIX.md). Evidence: [TEST_REP
 | Language | Tamil fixed messages not Spanish | PASS |
 | UI | TA interface fully in Thanglish (180/180 strings), Tamil default on first launch | PASS (screenshot verified) |
 | UI | Orb animation: distinct eased states, ripples, pulse, speaking/listening wired | PASS (screenshot per state) |
+| Companion | Personality + honesty rules in every prompt (no fake feelings, no unconfirmed actions) | PASS (unit test) / PARTIAL (needs live AI) |
+| Companion | Live capability registry (5 states) used by the AI prompt and `/api/security/capabilities` | PASS |
+| Companion | Memory list / edit / forget / private mode, secrets refused | PASS (unit + live) |
+| Companion | Clear Thanglish message when no AI key | PASS (live UI) |
+| Companion | Follow-up context with real AI | BLOCKED — needs API key |
 | Voice | Spoken Tamil recognition | PARTIAL |
 | Voice | Tamil speech output (Gemini Live) | PARTIAL |
 | Voice | Offline Tamil speech output | BLOCKED |

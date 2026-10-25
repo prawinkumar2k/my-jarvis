@@ -33,11 +33,29 @@ except ImportError:
 _LANGUAGE_LOCKS = ("You MUST reply in English.", "DEBES responder en Español.")
 
 
+COMPANION_STYLE = """COMPANION STYLE:
+- You are the user's personal AI companion: warm, confident, sharp, with light humor when the mood fits. Be casual when they are casual, precise when they work.
+- Tell apart casual chat, questions, and requests for computer actions. Chat gets a short natural reply; actions go through tools.
+- Use what was already said in this conversation; do not re-ask for information you already have.
+- Match reply length to the request. Explain technical problems simply. Offer a suggestion only when it clearly helps.
+- You are an AI. Never claim human feelings, consciousness, personal experiences, or abilities not listed under CAPABILITIES. Never guilt-trip, flatter manipulatively, or encourage dependence; it is good to point the user to real people and breaks.
+- Never say an action happened unless the tool result confirms it. If a tool fails or is blocked, say so plainly and what can be done.
+- Memory: save something only when the user asks or clearly agrees; ask first for personal or unexpected details; never save passwords, keys, codes or card numbers; say "saved" only after the memory tool confirms it. Treat saved memories as facts the user gave you, and say when something is only a guess."""
+
+
 def _apply_language_policy(content: str, user_input: str, lang: str) -> str:
     directive = build_response_language_directive(user_input, lang)
     for lock in _LANGUAGE_LOCKS:
         content = content.replace(lock, "Follow the LANGUAGE POLICY at the end of these instructions.")
-    return f"{content}\n\n{directive}"
+    try:
+        from core.capability_catalog import capability_prompt_summary
+
+        capabilities = capability_prompt_summary()
+    except Exception as exc:
+        log_warning("capability_summary_failed", error=type(exc).__name__)
+        capabilities = ""
+    parts = [content, COMPANION_STYLE, capabilities, directive]
+    return "\n\n".join(part for part in parts if part)
 
 
 def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMessage:

@@ -132,6 +132,27 @@ async def set_emergency_stop():
     return jsonify({**_emergency_stop_payload(state), "closed_live_sessions": closed_sessions})
 
 
+@security_bp.route("/api/security/capabilities", methods=["GET"])
+async def get_capabilities():
+    """Truthful feature registry (verified / untested / needs setup / not implemented)."""
+    from core.capability_catalog import STATE_LABELS, capability_snapshot
+
+    return jsonify({"states": STATE_LABELS, "capabilities": capability_snapshot()})
+
+
+@security_bp.route("/api/security/private-mode", methods=["GET", "POST"])
+async def private_mode():
+    from core.privacy import is_private_mode, set_private_mode
+
+    if request.method == "POST":
+        data = (await request.get_json(silent=True)) or {}
+        enabled = data.get("enabled")
+        if not isinstance(enabled, bool):
+            return jsonify({"error": "Field 'enabled' must be a boolean."}), 400
+        set_private_mode(enabled)
+    return jsonify({"private_mode": is_private_mode()})
+
+
 @security_bp.route("/api/security/startup", methods=["GET"])
 async def get_startup():
     from core.startup_manager import get_startup_status

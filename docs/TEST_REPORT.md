@@ -8,7 +8,7 @@ Environment: Windows 11 Pro, Python 3.12.10, project `venv`, branch
 | Command | Result |
 | --- | --- |
 | `pytest -q` (untouched `main`, temp worktree) | 801 passed, 2 failed, 1 skipped, 95 errors (errors = pytest tmp dir creation in that location) |
-| `pytest -q` (this branch, project folder) | **955 passed, 1 failed, 1 skipped** |
+| `pytest -q` (this branch, project folder) | **966 passed, 1 failed, 1 skipped** |
 | `pytest tests\test_multilingual_tamil.py tests\test_file_tools.py tests\test_emergency_stop.py tests\test_windows_startup.py -q` | 58 passed |
 | PowerShell parser on all `scripts\*.ps1` / `.psm1` | 0 errors |
 | `ruff check src/backend` | All checks passed |
@@ -34,6 +34,21 @@ Tests changed, with reason:
 
 - **Login startup (real Windows, no admin):** enable/disable via shortcut and Task Scheduler; launch through the exact login command (`start-jarvis.ps1 -AutoStart`) → backend ready in 12 s, `startup.log` written; second launch refused by the script and by the `start_app.py` mutex; `stop-jarvis.ps1` stopped 4 processes; live `POST /api/security/startup` on/off OK, hostile origin → 403; live emergency stop on/off OK. Details: [STARTUP_CONFIGURATION.md](STARTUP_CONFIGURATION.md).
 - **`install.ps1` health-check command:** `/api/status` → 200.
+
+## Companion acceptance test (2026-10-26, this machine, real modules, no mocks)
+
+| # | Check | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Friendly Thanglish greeting | **PARTIAL** | No AI key configured. Live UI answered "Vanakkam JARVIS, eppadi irukka?" with a Thanglish explanation: "En AI brain innum connect aagala. Setup screen-la GEMINI_API_KEY illa GROQ_API_KEY podunga…". Language detection + companion prompt are unit-tested; a real AI greeting needs a key. |
+| 2 | Follow-up using conversation context | **BLOCKED** | Needs an AI provider key. |
+| 3 | Open a Windows application | **PASS** | `abrir_aplicacion("notepad")` started a new `notepad.exe` (PID recorded), then closed by the test. |
+| 4 | Real system information | **PASS** | `Windows 11, CPU 18–31%, 8 cores, RAM 48% of 31.7 GB, disk 292 GB free, battery 100% (charging)`. |
+| 5 | Memory save and retrieval | **PASS** | Saved "Acceptance test colour: teal", listed by `ver_memorias`. |
+| 6 | Memory edit and deletion | **PASS** | Edited to "orange", then `olvidar_memoria` removed it (also from the cognitive graph). Secret "my password is …" refused. |
+| 7 | Voice interruption | **NOT RUN** | No microphone/speaker session in this environment. Code path: `Esc` / STOP → `interrumpirAudio()`; Gemini Live barge-in is upstream. |
+| 8 | Emergency STOP during a task | **PASS** | `POST /api/security/emergency-stop` → 200; `_security_guard("abrir_aplicacion")` refused with "Emergency stop is active…"; released afterwards. |
+| 9 | Clear explanation when provider/voice unavailable | **PASS** (provider) / NOT RUN (voice) | See #1; previously the UI showed only "Command mudiyala". |
+| — | Capability registry | **PASS** | `/api/security/capabilities` returned 24 entries; `conversation = needs_configuration` without a key. |
 
 ## Not run (needs hardware, credentials, or a person)
 

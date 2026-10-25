@@ -486,6 +486,16 @@ class ProceduralMemoryStore:
             conn.commit()
             return cur.rowcount > 0
 
+    def delete_cognitive_nodes_by_content(self, content: str, profile_id: str) -> int:
+        """Delete fact nodes whose content matches exactly (user 'forget' requests)."""
+        with self._lock, self._get_connection() as conn:
+            cur = conn.execute(
+                "DELETE FROM cognitive_nodes WHERE content = ? AND profile_id = ?",
+                (str(content).strip(), str(profile_id).strip()),
+            )
+            conn.commit()
+            return cur.rowcount
+
     # ─────────────────────────────────────────
     # Episodic Memory CRUD
     # ─────────────────────────────────────────

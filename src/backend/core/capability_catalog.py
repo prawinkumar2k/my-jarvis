@@ -51,6 +51,7 @@ def _entries() -> list[Capability]:
     gemini = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     files_on = _flag("JARVIS_FILE_TOOLS_ENABLED") or _flag("JARVIS_SYSTEM_TOOLS_ENABLED")
     playwright = importlib.util.find_spec("playwright") is not None
+    wake_engine = importlib.util.find_spec("openwakeword") is not None and importlib.util.find_spec("sounddevice") is not None
     return [
         Capability("conversation", "Conversation in Thanglish, English and Tamil", _when(llm, UNTESTED, NEEDS_CONFIG),
                    "Needs GEMINI_API_KEY or GROQ_API_KEY." if not llm else "Language detection is verified; reply quality depends on the AI model."),
@@ -71,7 +72,10 @@ def _entries() -> list[Capability]:
         Capability("speech_output", "Speaking replies (English voice; Thanglish pronounced by it)", VERIFIED),
         Capability("tamil_speech_offline", "Speaking Tamil offline", NOT_IMPLEMENTED, "No Tamil local voice is bundled."),
         Capability("wake_word_browser", "\"Jarvis\" wake phrase via browser speech recognition", NEEDS_HARDWARE, "Online; needs a microphone."),
-        Capability("wake_word_offline", "Offline wake-word engine", NOT_IMPLEMENTED),
+        Capability("wake_word_offline", "Offline \"Hey Jarvis\" wake word (openWakeWord, audio stays on this PC)",
+                   _when(wake_engine, UNTESTED, NEEDS_CONFIG),
+                   "Engine verified with synthesized speech and this PC's microphone; your own voice not yet tested."
+                   if wake_engine else "Install requirements-optional.txt."),
         Capability("browser_automation", "Browser automation (Playwright)", _when(playwright, UNTESTED, NEEDS_CONFIG),
                    "" if playwright else "Install requirements-optional.txt."),
         Capability("screen_analysis", "Analyzing a screenshot you approve", _when(llm, UNTESTED, NEEDS_CONFIG)),

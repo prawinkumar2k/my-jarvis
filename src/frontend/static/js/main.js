@@ -2495,11 +2495,75 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
             emergencyStopEngaged = data.engaged === true;
             ui.addLogEntry(emergencyStopEngaged ? t('emergency_engaged_log') : t('emergency_released_log'));
+            if (emergencyStopEngaged && typeof wakewordTimer !== 'undefined' && wakewordTimer) {
+                clearInterval(wakewordTimer);
+                wakewordTimer = null;
+                wakewordEnabled = false;
+                renderWakeword();
+            }
         } catch (err) {
             ui.addLogEntry(`> EMERGENCY STOP: ${err.message}`);
         }
         renderEmergencyStop();
     }
+
+    // Offline "Hey Jarvis" (openWakeWord on the backend; audio never leaves the PC).
+    let wakewordEnabled = false;
+    let wakewordLastEvent = 0;
+    let wakewordTimer = null;
+
+    function renderWakeword() {
+        const btn = document.getElementById('wakeword-toggle');
+        if (!btn) return;
+        btn.setAttribute('aria-pressed', String(wakewordEnabled));
+        btn.textContent = wakewordEnabled ? t('wakeword_on') : t('wakeword_off');
+    }
+
+    async function pollWakeword() {
+        try {
+            const res = await fetch(`/api/security/wakeword?since=${wakewordLastEvent}`, { cache: 'no-store' });
+            const data = await res.json();
+            if (!data.listening) {
+                wakewordEnabled = false;
+                clearInterval(wakewordTimer);
+                wakewordTimer = null;
+                if (data.error) ui.addLogEntry(`> HEY JARVIS: ${data.error}`);
+                renderWakeword();
+                return;
+            }
+            const events = data.events || [];
+            if (events.length) {
+                wakewordLastEvent = events[events.length - 1].event_id;
+                if (currentMode === 'idle' || currentMode === 'passive') activateFromWakeWord();
+            }
+        } catch (_) {
+            // Backend briefly unavailable; keep polling.
+        }
+    }
+
+    async function toggleWakeword() {
+        const enable = !wakewordEnabled;
+        try {
+            const res = await fetch('/api/security/wakeword', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enable })
+            });
+            const data = await res.json();
+            wakewordEnabled = data.listening === true;
+            const last = (data.events || []).slice(-1)[0];
+            if (last) wakewordLastEvent = last.event_id;
+            ui.addLogEntry(`> HEY JARVIS: ${data.error || (wakewordEnabled ? t('wakeword_on') : t('wakeword_off'))}`);
+        } catch (err) {
+            ui.addLogEntry(`> HEY JARVIS: ${err.message}`);
+        }
+        clearInterval(wakewordTimer);
+        wakewordTimer = wakewordEnabled ? setInterval(pollWakeword, 700) : null;
+        renderWakeword();
+    }
+
+    document.getElementById('wakeword-toggle')?.addEventListener('click', toggleWakeword);
+    renderWakeword();
 
     // Windows login auto-start (Startup-folder shortcut managed by scripts\enable-startup.ps1).
     let autostartEnabled = false;

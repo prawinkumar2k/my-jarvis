@@ -94,7 +94,12 @@ def test_capability_registry_uses_five_states_and_live_config(monkeypatch):
     assert {item["state"] for item in snap.values()} <= set(capability_catalog.STATE_LABELS)
     assert snap["conversation"]["state"] == capability_catalog.NEEDS_CONFIG
     assert snap["file_write"]["state"] == capability_catalog.NEEDS_CONFIG
-    assert snap["wake_word_offline"]["state"] == capability_catalog.NOT_IMPLEMENTED
+    import importlib.util
+
+    engine = importlib.util.find_spec("openwakeword") is not None and importlib.util.find_spec("sounddevice") is not None
+    expected = capability_catalog.UNTESTED if engine else capability_catalog.NEEDS_CONFIG
+    assert snap["wake_word_offline"]["state"] == expected
+    assert snap["monitors"]["state"] == capability_catalog.NOT_IMPLEMENTED
     monkeypatch.setenv("GROQ_API_KEY", "gsk_test")
     monkeypatch.setenv("JARVIS_FILE_TOOLS_ENABLED", "true")
     snap = {item["key"]: item for item in capability_catalog.capability_snapshot()}

@@ -2,6 +2,8 @@
 Security Routes: security policy, proactive alerts, quick control.
 """
 
+import asyncio
+
 from core.jarvis_observability import obs_snapshot
 from quart import Blueprint, jsonify, request
 
@@ -117,6 +119,12 @@ async def set_emergency_stop():
     closed_sessions = 0
     if engaged:
         try:
+            from voice.wake_word import wake_word_listener
+
+            await asyncio.to_thread(wake_word_listener.stop)
+        except Exception as exc:
+            print(f"[WARN emergency_stop] wake word stop failed: {type(exc).__name__}")
+        try:
             from voice.live_session import live_session_manager
 
             closed_sessions = await live_session_manager.close_all()
@@ -153,6 +161,34 @@ async def private_mode():
     return jsonify({"private_mode": is_private_mode()})
 
 
+@security_bp.route("/api/security/wakeword", methods=["GET", "POST"])
+async def wakeword():
+    """Offline "Hey Jarvis" listener. GET ?since=<event_id> returns new detections."""
+
+    from voice.wake_word import wake_word_listener
+
+    if request.method == "POST":
+        data = (await request.get_json(silent=True)) or {}
+        enabled = data.get("enabled")
+        if not isinstance(enabled, bool):
+            return jsonify({"error": "Field 'enabled' must be a boolean."}), 400
+        if enabled:
+            from core.security import emergency_stop
+
+            if emergency_stop.is_engaged():
+                return jsonify({**wake_word_listener.status(), "error": "Emergency stop is active."}), 409
+            ok, message = await asyncio.to_thread(wake_word_listener.start)
+            if not ok:
+                return jsonify({**wake_word_listener.status(), "error": message}), 503
+        else:
+            await asyncio.to_thread(wake_word_listener.stop)
+    try:
+        since = int(request.args.get("since", "0"))
+    except ValueError:
+        since = 0
+    return jsonify(wake_word_listener.status(since))
+
+
 @security_bp.route("/api/security/startup", methods=["GET"])
 async def get_startup():
     from core.startup_manager import get_startup_status
@@ -163,7 +199,6 @@ async def get_startup():
 @security_bp.route("/api/security/startup", methods=["POST"])
 async def set_startup():
     """Enable ({"enabled": true, "method": "Shortcut"|"TaskScheduler"}) or disable login auto-start."""
-    import asyncio
 
     from core.startup_manager import set_startup_enabled
 

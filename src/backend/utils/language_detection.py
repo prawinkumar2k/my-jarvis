@@ -138,7 +138,11 @@ def resolve_response_language(user_text: str, active_language: str, preference: 
     if pref != "auto":
         return pref
     detected = detect_input_language(user_text)
-    if detected.code in {"ta", "thanglish", "es"}:
+    if detected.code == "ta":
+        # Owner preference: Tamil is written in English letters unless
+        # JARVIS_RESPONSE_LANGUAGE=ta explicitly asks for Tamil script.
+        return "thanglish"
+    if detected.code in {"thanglish", "es"}:
         return detected.code
     active = str(active_language or "en").strip().lower()
     if detected.code == "en":

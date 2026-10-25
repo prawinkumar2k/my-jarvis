@@ -78,7 +78,9 @@ def test_empty_input_is_undetermined():
 
 def test_reply_mirrors_input_style_in_auto_mode():
     assert resolve_response_language("Spotify open pannu", "en") == "thanglish"
-    assert resolve_response_language("பாடல் போடு", "en") == "ta"
+    # Tamil-script input is answered in Thanglish (English letters) by default.
+    assert resolve_response_language("பாடல் போடு", "en") == "thanglish"
+    assert resolve_response_language("பாடல் போடு", "en", preference="ta") == "ta"
     assert resolve_response_language("open spotify", "ta") == "en"
 
 

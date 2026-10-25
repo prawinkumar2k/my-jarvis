@@ -77,10 +77,11 @@ def _entries() -> list[Capability]:
         Capability("screen_analysis", "Analyzing a screenshot you approve", _when(llm, UNTESTED, NEEDS_CONFIG)),
         Capability("reminders", "Reminders within this session", UNTESTED),
         Capability("spotify", "Spotify control", NEEDS_CONFIG, "Needs Spotify app credentials."),
-        Capability("clipboard", "Clipboard read/write", NOT_IMPLEMENTED),
+        Capability("clipboard", "Clipboard read/write on request (secrets withheld)", VERIFIED),
         Capability("calendar_email", "Calendar and email", NOT_IMPLEMENTED),
         Capability("coding_agent", "Editing and testing code projects", NOT_IMPLEMENTED),
-        Capability("duplicates_monitors", "Duplicate-file finder, multi-monitor window layouts", NOT_IMPLEMENTED),
+        Capability("duplicates", "Duplicate-file and large-file finder (read-only)", VERIFIED),
+        Capability("monitors", "Multi-monitor window layouts", NOT_IMPLEMENTED),
     ]
 
 

@@ -84,6 +84,11 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "previsualizar_organizacion": ToolPolicy("previsualizar_organizacion", "elevated", ("admin",), False, True),
     "abrir_configuracion_windows": ToolPolicy("abrir_configuracion_windows", "elevated", ("admin",), False, True),
     "crear_carpeta": ToolPolicy("crear_carpeta", "elevated", ("admin",), False, True),
+    "buscar_duplicados": ToolPolicy("buscar_duplicados", "elevated", ("admin",), False, True),
+    "archivos_grandes": ToolPolicy("archivos_grandes", "elevated", ("admin",), False, True),
+    # Clipboard: owner-only, on request only, contents never logged.
+    "leer_portapapeles": ToolPolicy("leer_portapapeles", "elevated", ("admin",), False, True),
+    "copiar_al_portapapeles": ToolPolicy("copiar_al_portapapeles", "elevated", ("admin",), False, True),
     "copiar_archivo": ToolPolicy("copiar_archivo", "elevated", ("admin",), False, True),
     "mover_archivo": ToolPolicy("mover_archivo", "critical", ("admin",), True, True),
     "renombrar_archivo": ToolPolicy("renombrar_archivo", "critical", ("admin",), True, True),

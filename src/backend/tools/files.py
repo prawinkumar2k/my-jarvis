@@ -491,3 +491,92 @@ def organizar_carpeta(carpeta: str = "") -> str:
         return f"Nothing to organize in {_display(path)}."
     tail = f"; {failed} could not be moved" if failed else ""
     return f"Organized {_display(path)}: moved {moved} file(s){tail}."
+
+
+# ─────────────────────────────────────────
+# Read-only analysis: duplicates and large files
+# ─────────────────────────────────────────
+def _walk_files(folder: Path):
+    """Yield (path, size) for regular files, skipping protected entries, within the search budget."""
+    visited = 0
+    deadline = time.monotonic() + MAX_SEARCH_SECONDS * 2
+    for current, dirs, names in os.walk(folder, followlinks=False):
+        dirs[:] = [d for d in dirs if d.lower() not in _PROTECTED_DIRS and not d.startswith(".")]
+        for name in names:
+            path = Path(current) / name
+            visited += 1
+            if visited > MAX_SEARCH_VISITED or time.monotonic() > deadline:
+                return
+            if is_protected_path(path) or path.is_symlink():
+                continue
+            try:
+                yield path, path.stat().st_size
+            except OSError:
+                continue
+
+
+def _sha256(path: Path) -> str | None:
+    import hashlib
+
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def find_duplicate_groups(folder: Path, min_size: int = 1) -> list[list[Path]]:
+    """Groups of files with identical content (size match, then SHA-256)."""
+    by_size: dict[int, list[Path]] = {}
+    for path, size in _walk_files(folder):
+        if size >= min_size:
+            by_size.setdefault(size, []).append(path)
+    groups: list[list[Path]] = []
+    for paths in by_size.values():
+        if len(paths) < 2:
+            continue
+        by_hash: dict[str, list[Path]] = {}
+        for path in paths:
+            digest = _sha256(path)
+            if digest:
+                by_hash.setdefault(digest, []).append(path)
+        groups.extend(sorted(group) for group in by_hash.values() if len(group) > 1)
+    return sorted(groups, key=lambda g: -g[0].stat().st_size if g[0].exists() else 0)
+
+
+@tool
+def buscar_duplicados(carpeta: str = "") -> str:
+    """Find duplicate files (identical content by SHA-256) in an authorized folder. Read-only: never deletes."""
+    path, error = _resolve_target(carpeta, must_exist=True, allow_root=True)
+    if path is None:
+        return error
+    if not path.is_dir():
+        return f"Not a folder: {_display(path)}"
+    groups = find_duplicate_groups(path)
+    if not groups:
+        return f"No duplicate files in {_display(path)}."
+    wasted = sum(g[0].stat().st_size * (len(g) - 1) for g in groups if g[0].exists())
+    lines = []
+    for group in groups[:20]:
+        size = _human_size(group[0].stat().st_size) if group[0].exists() else "?"
+        lines.append(f"- {len(group)} copies ({size} each): " + ", ".join(_display(p) for p in group[:5]))
+    more = f"\n... and {len(groups) - 20} more groups" if len(groups) > 20 else ""
+    return f"{len(groups)} duplicate group(s), {_human_size(wasted)} reclaimable. Nothing was deleted.\n" + "\n".join(lines) + more
+
+
+@tool
+def archivos_grandes(carpeta: str = "", cantidad: int = 10) -> str:
+    """List the largest files in an authorized folder. Read-only."""
+    path, error = _resolve_target(carpeta, must_exist=True, allow_root=True)
+    if path is None:
+        return error
+    if not path.is_dir():
+        return f"Not a folder: {_display(path)}"
+    count = max(1, min(int(cantidad or 10), 50))
+    largest = sorted(_walk_files(path), key=lambda item: item[1], reverse=True)[:count]
+    if not largest:
+        return f"No files in {_display(path)}."
+    return f"Largest files in {_display(path)}:\n" + "\n".join(f"- {_human_size(s)}  {_display(p)}" for p, s in largest)

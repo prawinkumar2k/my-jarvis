@@ -28,7 +28,7 @@ Thanglish, which the English local voice can pronounce.
 
 1. Session language (`en`, `es`, `ta`) from the header selector sets recognition language, local voice, and fixed messages.
 2. Each typed or transcribed message is classified offline: Tamil script, Thanglish (≈150 marker words such as `pannu`, `sollu`, `irukku`, `enna`), Spanish, or English. Code spans, paths and URLs are ignored during detection.
-3. The system prompt gets one `LANGUAGE POLICY` line: reply in Tamil script, in Thanglish, or in English, and never translate code, commands, file names, paths or app names.
+3. The system prompt gets one `LANGUAGE POLICY` line: reply in Thanglish (also for Tamil-script input, by default), English, or Tamil script only when `JARVIS_RESPONSE_LANGUAGE=ta`, and never translate code, commands, file names, paths or app names.
 4. `JARVIS_RESPONSE_LANGUAGE=en|ta|thanglish|es` pins the reply language.
 
 Examples that are detected as Thanglish: `Notepad open pannu`, `laptop battery percentage sollu`,
@@ -43,7 +43,7 @@ English sentences such as `Open the file and close the window` stay English.
 | Text input fallback | existing |
 | Gemini Live full duplex with barge-in | existing (needs `GEMINI_API_KEY`) |
 | "Jarvis" wake phrase | existing, **browser speech recognition** — online in Chromium/WebView2, not an offline engine |
-| Offline wake-word engine | NOT IMPLEMENTED (candidate: openWakeWord, Apache-2.0) |
+| Offline "Hey Jarvis" (openWakeWord) | **HEY JARVIS** header toggle. Runs locally; mic open only while ON; audio never stored or sent. Needs `pip install -r requirements-optional.txt`; the model downloads once to `%LOCALAPPDATA%\Jarvis\models\wakeword`. Tune with `JARVIS_WAKE_WORD_THRESHOLD` (0.5) and `JARVIS_WAKE_WORD_COOLDOWN` (2 s). Model license: CC BY-NC-SA 4.0 (personal, non-commercial use). |
 | Stop voice | STOP button / `Ctrl+Shift+X` closes live sessions and playback; `Esc` interrupts speech |
 
 Privacy: the microphone is off until you press the voice button. Audio is not

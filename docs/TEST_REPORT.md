@@ -8,7 +8,7 @@ Environment: Windows 11 Pro, Python 3.12.10, project `venv`, branch
 | Command | Result |
 | --- | --- |
 | `pytest -q` (untouched `main`, temp worktree) | 801 passed, 2 failed, 1 skipped, 95 errors (errors = pytest tmp dir creation in that location) |
-| `pytest -q` (this branch, project folder) | **966 passed, 1 failed, 1 skipped** |
+| `pytest -q` (this branch, project folder) | **982 passed, 1 failed, 1 skipped** |
 | `pytest tests\test_multilingual_tamil.py tests\test_file_tools.py tests\test_emergency_stop.py tests\test_windows_startup.py -q` | 58 passed |
 | PowerShell parser on all `scripts\*.ps1` / `.psm1` | 0 errors |
 | `ruff check src/backend` | All checks passed |
@@ -45,6 +45,10 @@ Tests changed, with reason:
 | 4 | Real system information | **PASS** | `Windows 11, CPU 18–31%, 8 cores, RAM 48% of 31.7 GB, disk 292 GB free, battery 100% (charging)`. |
 | 5 | Memory save and retrieval | **PASS** | Saved "Acceptance test colour: teal", listed by `ver_memorias`. |
 | 6 | Memory edit and deletion | **PASS** | Edited to "orange", then `olvidar_memoria` removed it (also from the cognitive graph). Secret "my password is …" refused. |
+| — | Offline wake word | **PARTIAL** | Piper-spoken "Hey Jarvis!" → score 1.000 (detected once); "Open notepad please." / "Hey, how are you?" → 0.000. Real mic (Intel Smart Sound array) opened for 5 s: no false trigger, released cleanly. Human voice not tested. |
+| — | Persistent reminder | **PASS** | Missed reminder stored in `%LOCALAPPDATA%\Jarvis\memory
+eminders.json` appeared in the running UI as "JARVIS off-la irundhappo vandha reminder: …" and was not repeated. |
+| — | Clipboard | **PASS** (read) | Live read of 494 characters, content never printed; writes tested with a stub so your clipboard was not overwritten. |
 | 7 | Voice interruption | **NOT RUN** | No microphone/speaker session in this environment. Code path: `Esc` / STOP → `interrumpirAudio()`; Gemini Live barge-in is upstream. |
 | 8 | Emergency STOP during a task | **PASS** | `POST /api/security/emergency-stop` → 200; `_security_guard("abrir_aplicacion")` refused with "Emergency stop is active…"; released afterwards. |
 | 9 | Clear explanation when provider/voice unavailable | **PASS** (provider) / NOT RUN (voice) | See #1; previously the UI showed only "Command mudiyala". |

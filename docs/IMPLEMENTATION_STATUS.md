@@ -8,7 +8,7 @@ Details per feature: [FEATURE_MATRIX.md](FEATURE_MATRIX.md). Evidence: [TEST_REP
 | --- | --- | --- |
 | Repository | Upstream links removed, MIT notice kept, history preserved, backup made | PASS |
 | Repository | Remote `prawinkumar2k/my-jarvis` configured | PASS |
-| Repository | Pushed to GitHub | BLOCKED — stored credential belongs to another GitHub account (see TROUBLESHOOTING) |
+| Repository | Pushed to GitHub (all branches + LFS models) | PASS — LFS uploaded through the official batch API at a capped rate (see TROUBLESHOOTING) |
 | Install | `setup.ps1` from ZIP / no LFS remote (voice download, SHA-256 matches) | PASS |
 | Install | `scripts/install.ps1` with health check | PARTIAL — health-check command verified separately; full fresh install not rerun |
 | Startup | Enable/disable shortcut and logon task, no admin | PASS |
@@ -29,11 +29,15 @@ Details per feature: [FEATURE_MATRIX.md](FEATURE_MATRIX.md). Evidence: [TEST_REP
 | Voice | Spoken Tamil recognition | PARTIAL |
 | Voice | Tamil speech output (Gemini Live) | PARTIAL |
 | Voice | Offline Tamil speech output | BLOCKED |
-| Voice | Offline wake word | NOT IMPLEMENTED |
+| Voice | Offline "Hey Jarvis" wake word (openWakeWord) | PARTIAL — engine verified with synthesized speech (1 detection, 0 false), real mic stream verified; your own voice not yet tested |
 | Desktop | File list/search/info/Settings pages | PASS |
 | Desktop | Create/copy/move/rename/delete/organize with confirmation | PASS (Recycle Bin path PARTIAL) |
 | Desktop | Apps, volume, windows, processes, power | existing upstream (PASS by upstream tests) |
-| Desktop | Clipboard, duplicate finder, large files, multi-monitor, Wi-Fi/Bluetooth toggles, lock workstation tool | NOT IMPLEMENTED |
+| Desktop | Clipboard read/write (secrets withheld) | PASS (unit + live read) |
+| Desktop | Duplicate finder (SHA-256) and large-file finder | PASS |
+| Productivity | Reminders persist across restarts and fire without the scheduler | PASS (unit + live UI) |
+| Language | Tamil-script input answered in Thanglish by default | PASS |
+| Desktop | Multi-monitor layouts, Wi-Fi/Bluetooth toggles, lock workstation tool | NOT IMPLEMENTED |
 | Safety | Emergency stop at both execution gates + live voice + playback | PASS (backend/API) / PARTIAL (UI not visually checked) |
 | Safety | Tool registry with risk levels and confirmation | PASS (see TOOL_REGISTRY.md) |
 | Agent | Exactly-once pipeline | existing |

@@ -25,6 +25,8 @@ Catalog column: **default** = always registered; **file opt-in** = `JARVIS_FILE_
 | `buscar_en_wikipedia` | `tools.browser` | elevated | 0–1 | yes | no | yes | default | Busca un tema y abre directamente el artículo de Wikipedia en el navegador del usuario. |
 | `leer_archivo` | `tools.utilities` | critical | 2–3 | yes | yes | yes | default | Lee un archivo de texto del escritorio o ruta indicada y devuelve su contenido. SOLO cuando el usuario diga 'l |
 | `poner_recordatorio` | `tools.utilities` | public | 0 | no | no | no | default | Programa un recordatorio de voz en X minutos. SOLO cuando el usuario diga 'recuérdame X en Y minutos/horas'. |
+| `listar_recordatorios` | `tools.utilities` | public | 0 | no | no | no | default | List pending reminders with their ids and times. |
+| `cancelar_recordatorio` | `tools.utilities` | public | 0 | no | no | no | default | Cancel one pending reminder by its id from listar_recordatorios or a unique word in its text. |
 | `reproducir_en_spotify` | `modules.spotify.tools` | public | 0 | no | no | no | default | Play music using a cached Spotify API session or Spotify Desktop. |
 | `reproducir_mix_spotify` | `modules.spotify.tools` | public | 0 | no | no | no | default | Play a seed and build a dynamic AutoMix around it. |
 | `controlar_reproduccion` | `modules.spotify.tools` | public | 0 | no | no | no | default | Control Spotify through a cached API session or Spotify Desktop. |
@@ -40,6 +42,10 @@ Catalog column: **default** = always registered; **file opt-in** = `JARVIS_FILE_
 | `matar_proceso` | `tools.system` | critical | 2–3 | yes | yes | yes | default | Detiene un proceso por nombre. Requiere autorización. |
 | `borrar_memoria` | `tools.system` | critical | 2–3 | yes | yes | yes | default | Reseteo total de memoria. Autorización de nivel 5 obligatoria. |
 | `guardar_dato_memoria` | `tools.memory` | public | 0 | no | no | no | default | Guarda un dato, preferencia o recuerdo en la memoria permanente del usuario para recordarlo siempre. |
+| `ver_memorias` | `tools.memory` | elevated | 0–1 | yes | no | yes | default | List everything JARVIS has saved about the user in long-term memory, numbered. Use for 'what do you remember a |
+| `editar_memoria` | `tools.memory` | elevated | 0–1 | yes | no | yes | default | Replace one saved memory, chosen by its number from ver_memorias or a unique word in it. |
+| `olvidar_memoria` | `tools.memory` | elevated | 0–1 | yes | no | yes | default | Delete one saved memory (by number from ver_memorias or a unique word in it), including its copy in the cognit |
+| `modo_privado` | `tools.memory` | elevated | 0–1 | yes | no | yes | default | Turn private mode on or off. While on, JARVIS saves nothing new to long-term memory. |
 | `listar_ventanas` | `tools.desktop_control` | elevated | 0–1 | yes | no | yes | default | Lista ventanas visibles del escritorio local. |
 | `enfocar_ventana` | `tools.desktop_control` | elevated | 0–1 | yes | no | yes | default | Enfoca una ventana visible por titulo parcial o identificador. |
 | `controlar_ventana` | `tools.desktop_control` | elevated | 0–1 | yes | no | yes | default | Controla una ventana visible: enfocar, minimizar, maximizar, restaurar o cerrar. |
@@ -56,6 +62,10 @@ Catalog column: **default** = always registered; **file opt-in** = `JARVIS_FILE_
 | `informacion_sistema` | `tools.files` | public | 0 | no | no | no | default | Report CPU, memory, disk, battery and uptime for this computer. |
 | `abrir_configuracion_windows` | `tools.files` | elevated | 0–1 | yes | no | yes | default | Open a Windows Settings page. Valid pages: display, sound, bluetooth, wifi, network, battery, power, apps, def |
 | `previsualizar_organizacion` | `tools.files` | elevated | 0–1 | yes | no | yes | default | Preview how loose files in a folder would be grouped into Images, Documents, Audio, Video, Archives, Installer |
+| `buscar_duplicados` | `tools.files` | elevated | 0–1 | yes | no | yes | default | Find duplicate files (identical content by SHA-256) in an authorized folder. Read-only: never deletes. |
+| `archivos_grandes` | `tools.files` | elevated | 0–1 | yes | no | yes | default | List the largest files in an authorized folder. Read-only. |
+| `leer_portapapeles` | `tools.clipboard` | elevated | 0–1 | yes | no | yes | default | Read the text currently on the clipboard, only when the user asks (e.g. 'clipboard la enna irukku', 'explain w |
+| `copiar_al_portapapeles` | `tools.clipboard` | elevated | 0–1 | yes | no | yes | default | Put text on the clipboard so the user can paste it (replaces the current clipboard text). |
 | `crear_carpeta` | `tools.files` | elevated | 0–1 | yes | no | yes | file opt-in | Create a new folder inside an authorized folder. |
 | `copiar_archivo` | `tools.files` | elevated | 0–1 | yes | no | yes | file opt-in | Copy a file or folder to another location inside the authorized folders. Never overwrites. |
 | `mover_archivo` | `tools.files` | critical | 2–3 | yes | yes | yes | file opt-in | Move a file or folder to another authorized folder. Never overwrites. Requires confirmation. |

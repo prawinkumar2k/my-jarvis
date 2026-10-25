@@ -14,6 +14,8 @@
 | `llm_unconfigured` | No AI key | Add `GEMINI_API_KEY` or `GROQ_API_KEY`. |
 | pytest errors "could not create numbered dir" | Temp directory permissions on Windows | Run pytest from the project folder (uses repo-local `scratch/`). |
 | `git push` → 403 "Permission ... denied to <other account>" | Git Credential Manager saved a different GitHub login | Control Panel › Credential Manager › Windows Credentials › remove `git:https://github.com`, then `git push` and sign in as the repository owner; or `gh auth login` then `gh auth setup-git`. |
+| `git push` stalls at "Uploading LFS objects: 0% (0/2)" | Long full-speed uploads to GitHub's storage (Amazon S3) freeze on this network (`i/o timeout`); auth is fine | Upload the LFS objects at a capped rate (about 600 KB/s) with curl through the official LFS batch API, then run a normal `git push`. Repository-local settings `lfs.concurrenttransfers=1`, `lfs.activitytimeout=20` are set. |
+| HEY JARVIS turns itself off | No microphone, permission denied, or engine not installed | Read the message in the log panel; allow microphone for desktop apps; `pip install -r requirements-optional.txt`. |
 | JARVIS did not start after sign-in | Startup disabled, venv missing, or startup error | `.\scripts\status-jarvis.ps1`; read `%LOCALAPPDATA%\Jarvis\logs\startup.log`; rerun `.\scripts\enable-startup.ps1`. |
 | "JARVIS is already running" but no window | Stale process | `.\scripts\stop-jarvis.ps1`, then `.\scripts\start-jarvis.ps1`. |
 | `git lfs` smudge error on checkout | No LFS remote | `set GIT_LFS_SKIP_SMUDGE=1` before checkout; setup downloads voices instead. |

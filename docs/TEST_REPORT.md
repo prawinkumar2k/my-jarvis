@@ -8,8 +8,9 @@ Environment: Windows 11 Pro, Python 3.12.10, project `venv`, branch
 | Command | Result |
 | --- | --- |
 | `pytest -q` (untouched `main`, temp worktree) | 801 passed, 2 failed, 1 skipped, 95 errors (errors = pytest tmp dir creation in that location) |
-| `pytest -q` (this branch, project folder) | **945 passed, 1 failed, 1 skipped** |
-| `pytest tests\test_multilingual_tamil.py tests\test_file_tools.py tests\test_emergency_stop.py -q` | 48 passed |
+| `pytest -q` (this branch, project folder) | **955 passed, 1 failed, 1 skipped** |
+| `pytest tests\test_multilingual_tamil.py tests\test_file_tools.py tests\test_emergency_stop.py tests\test_windows_startup.py -q` | 58 passed |
+| PowerShell parser on all `scripts\*.ps1` / `.psm1` | 0 errors |
 | `ruff check src/backend` | All checks passed |
 | `pyright` on every changed backend file (venv interpreter) | 0 errors |
 | `python -m compileall -q start_app.py src\backend` | OK |
@@ -31,6 +32,9 @@ Tests changed, with reason:
 - **Voice model recovery:** `python -m piper.download_voices en_GB-northern_english_male-medium es_MX-claude-high --download-dir models --force-redownload` downloaded both voices; SHA-256 equals the upstream LFS object IDs (`57a219ae…`, `3ef40a71…`).
 - **Backend smoke (Quart test client, `JARVIS_TEST_MODE=1`):** `GET /api/status` 200; `GET /api/language` lists `ta` with `local_tts_native: false`; `POST /api/language {"language":"ta"}` 200 → `locale: ta-IN`; subsequent `GET` reports `current: ta`.
 
+- **Login startup (real Windows, no admin):** enable/disable via shortcut and Task Scheduler; launch through the exact login command (`start-jarvis.ps1 -AutoStart`) → backend ready in 12 s, `startup.log` written; second launch refused by the script and by the `start_app.py` mutex; `stop-jarvis.ps1` stopped 4 processes; live `POST /api/security/startup` on/off OK, hostile origin → 403; live emergency stop on/off OK. Details: [STARTUP_CONFIGURATION.md](STARTUP_CONFIGURATION.md).
+- **`install.ps1` health-check command:** `/api/status` → 200.
+
 ## Not run (needs hardware, credentials, or a person)
 
 | Area | Why |
@@ -41,6 +45,9 @@ Tests changed, with reason:
 | Recycle Bin deletion | Would touch a real Windows shell; tests force the POSIX path |
 | STOP button and Tamil labels in the desktop window | No visual session |
 | Playwright browser tools | Optional dependency not installed |
+| Real sign-out/sign-in auto-start | Requires signing out of your session |
+| Full fresh `scripts\install.ps1` run | Would reinstall the existing venv |
+| GitHub push | Rejected 403: stored credential is a different GitHub account |
 
 ## Manual acceptance checklist
 

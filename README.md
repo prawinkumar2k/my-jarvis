@@ -107,9 +107,10 @@ J.A.R.V.I.S. defaults to **Core Mode**, keeping the desktop, voice, memory, comp
 - **Tamil, Thanglish and English** in one conversation. Each message is classified (Tamil script, Thanglish, English, Spanish) and JARVIS replies the same way; code, paths and commands stay untouched. Select **TA** for Tamil speech recognition (`ta-IN` / Whisper `ta`). No local Tamil voice is bundled: spoken Tamil replies need Gemini Live.
 - **File tools** confined to `JARVIS_FILE_WRITE_ROOTS`: list, search, system info, Windows Settings pages, organize with preview; opt-in create/copy/move/rename/delete (Recycle Bin) with confirmation for destructive actions. Credential files are never visible.
 - **Emergency stop**: header **STOP** button or `Ctrl+Shift+X` blocks every tool, closes live voice and stops playback.
+- **Starts at Windows sign-in** (optional): `.\scripts\enable-startup.ps1` or the **AUTO-START** button; `start-jarvis.ps1`, `stop-jarvis.ps1`, `status-jarvis.ps1`; one instance only.
 - **ZIP installs work**: setup downloads the Piper voices when Git LFS is unavailable.
 
-Status, limits and test evidence: [Feature matrix](docs/FEATURE_MATRIX.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Test report](docs/TEST_REPORT.md) · [Windows install](docs/INSTALLATION_WINDOWS.md) · [Configuration](docs/CONFIGURATION.md) · [Security](docs/SECURITY.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Architecture](docs/ARCHITECTURE.md)
+Status, limits and test evidence: [Implementation status](docs/IMPLEMENTATION_STATUS.md) · [Startup](docs/STARTUP_CONFIGURATION.md) · [Voice & languages](docs/VOICE_AND_LANGUAGES.md) · [Tool registry](docs/TOOL_REGISTRY.md) · [Feature matrix](docs/FEATURE_MATRIX.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Test report](docs/TEST_REPORT.md) · [Windows install](docs/INSTALLATION_WINDOWS.md) · [Configuration](docs/CONFIGURATION.md) · [Security](docs/SECURITY_MODEL.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Architecture](docs/ARCHITECTURE.md)
 
 ---
 

@@ -17,6 +17,14 @@ the official Piper voice repository.
 
 ## Install
 
+One step (setup + `.env` + health check + optional login startup):
+
+```powershell
+.\scripts\install.ps1 -EnableStartup
+```
+
+Or step by step:
+
 ```powershell
 cd C:\path\to\JARVIS
 .\setup.ps1              # core
@@ -37,7 +45,13 @@ notepad .env
 Set at least `GEMINI_API_KEY` or `GROQ_API_KEY`. Never put keys in source files.
 See [CONFIGURATION.md](CONFIGURATION.md) for Tamil, file tools and safety settings.
 
+## Login startup
+
+See [STARTUP_CONFIGURATION.md](STARTUP_CONFIGURATION.md): `.\scripts\enable-startup.ps1`, `.\scripts\disable-startup.ps1`, or the AUTO-START button.
+
 ## Run and stop
+
+`.\scripts\start-jarvis.ps1`, `.\scripts\stop-jarvis.ps1`, `.\scripts\status-jarvis.ps1`, or:
 
 ```powershell
 python start_app.py                      # desktop window (re-runs inside venv)
@@ -53,8 +67,17 @@ without closing, press **STOP** in the header or `Ctrl+Shift+X`.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected on this branch: `945 passed, 1 skipped, 1 failed` — the failure is the
+Expected on this branch: `955 passed, 1 skipped, 1 failed` — the failure is the
 pre-existing CSS assertion listed in [TEST_REPORT.md](TEST_REPORT.md).
+
+## Uninstall
+
+```powershell
+.\scripts\uninstall-startup.ps1      # stops JARVIS, removes startup entries
+Remove-Item -Recurse .\venv          # optional: remove the Python environment
+```
+
+Your data (`%LOCALAPPDATA%\Jarvis`) and `.env` are kept until you delete them.
 
 ## Playwright browser automation (optional)
 

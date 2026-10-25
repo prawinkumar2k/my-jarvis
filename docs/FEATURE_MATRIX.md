@@ -58,5 +58,8 @@ manual/hardware verification; **partial** = works with stated gaps;
 | Calendar / email / meeting notes | — | blocked | — | Needs official OAuth integrations; none implemented. |
 | Docker / database diagnostics | — | not started | — | |
 | Offline-mode detection | partial (existing provider fallback) | existing | upstream tests | |
+| Windows login auto-start (shortcut / logon task) | `scripts/*.ps1`, `core/startup_manager.py` | verified (enable/disable/launch) | `tests/test_windows_startup.py` + live run | Real sign-out/sign-in not yet performed. |
+| Single instance, start/stop/status scripts, startup log | `start_app.py`, `scripts/` | verified | same + live run | |
+| AUTO-START toggle | `/api/security/startup`, header button | verified (API) / implemented (button) | live curl | |
 | Setup from ZIP (voice models) | `setup.ps1` | verified | contract test + real download, SHA-256 matched upstream | |
 | Upstream repo links removed | README, AGENTS, SECURITY, CODE_OF_CONDUCT, LICENSE | verified | grep | MIT notice kept, fork maintainer added. |

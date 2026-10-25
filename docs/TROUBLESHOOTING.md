@@ -13,4 +13,7 @@
 | 401/403 on API calls from another device | Critical routes need a token | Set `JARVIS_API_TOKEN` and send `X-JARVIS-API-TOKEN`. |
 | `llm_unconfigured` | No AI key | Add `GEMINI_API_KEY` or `GROQ_API_KEY`. |
 | pytest errors "could not create numbered dir" | Temp directory permissions on Windows | Run pytest from the project folder (uses repo-local `scratch/`). |
+| `git push` → 403 "Permission ... denied to <other account>" | Git Credential Manager saved a different GitHub login | Control Panel › Credential Manager › Windows Credentials › remove `git:https://github.com`, then `git push` and sign in as the repository owner; or `gh auth login` then `gh auth setup-git`. |
+| JARVIS did not start after sign-in | Startup disabled, venv missing, or startup error | `.\scripts\status-jarvis.ps1`; read `%LOCALAPPDATA%\Jarvis\logs\startup.log`; rerun `.\scripts\enable-startup.ps1`. |
+| "JARVIS is already running" but no window | Stale process | `.\scripts\stop-jarvis.ps1`, then `.\scripts\start-jarvis.ps1`. |
 | `git lfs` smudge error on checkout | No LFS remote | `set GIT_LFS_SKIP_SMUDGE=1` before checkout; setup downloads voices instead. |

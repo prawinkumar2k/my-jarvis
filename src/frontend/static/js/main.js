@@ -2565,6 +2565,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('wakeword-toggle')?.addEventListener('click', toggleWakeword);
     renderWakeword();
 
+    // Persistent reminders: the backend fires due ones; each is returned once.
+    async function checkReminders() {
+        try {
+            const res = await fetch('/api/security/reminders', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            for (const item of data.due || []) {
+                const prefix = item.missed ? t('reminder_missed') : t('reminder_now');
+                const message = `${prefix} ${item.text}`;
+                ui.addConversationSegment('jarvis', message);
+                ui.addLogEntry(`> ${message}`);
+                if (!isSpeaking) speak(message);
+            }
+        } catch (_) {
+            // Backend unavailable; try again on the next tick.
+        }
+    }
+    setTimeout(checkReminders, 4000);
+    setInterval(checkReminders, 15000);
+
     // Windows login auto-start (Startup-folder shortcut managed by scripts\enable-startup.ps1).
     let autostartEnabled = false;
 

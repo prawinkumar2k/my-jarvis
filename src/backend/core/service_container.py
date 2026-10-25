@@ -80,6 +80,14 @@ class ServiceContainer:
         cuando = datetime.now() + timedelta(minutes=minutes)
         with jarvis_state.recordatorios_lock:
             jarvis_state._recordatorios.append({"texto": text, "cuando": cuando})
+        try:
+            # Persistent copy: survives restarts and is delivered by the UI even
+            # when the optional scheduler is off (core mode).
+            from core.reminders import reminder_store
+
+            reminder_store.add(text, minutes)
+        except Exception as exc:
+            self.log_event("reminder_persist_failed", error=type(exc).__name__)
         self.log_event("reminder_added", text=text, minutes=minutes)
         print(f"  [SERVICES] Reminder added: {text} in {minutes} min")
 

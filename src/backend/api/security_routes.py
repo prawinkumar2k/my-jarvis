@@ -161,6 +161,15 @@ async def private_mode():
     return jsonify({"private_mode": is_private_mode()})
 
 
+@security_bp.route("/api/security/reminders", methods=["GET"])
+async def reminders_status():
+    """Pending reminders plus any that are due now (each due reminder is returned once)."""
+    from core.reminders import reminder_store
+
+    due = await asyncio.to_thread(reminder_store.take_unshown)
+    return jsonify({"pending": reminder_store.pending(), "due": due})
+
+
 @security_bp.route("/api/security/wakeword", methods=["GET", "POST"])
 async def wakeword():
     """Offline "Hey Jarvis" listener. GET ?since=<event_id> returns new detections."""

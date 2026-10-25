@@ -580,7 +580,33 @@ def poner_recordatorio(texto: str, minutos: int) -> str:
     SOLO cuando el usuario diga 'recuérdame X en Y minutos/horas'."""
     agregar_recordatorio(texto, minutos)
     hora = (datetime.now() + timedelta(minutes=minutos)).strftime("%H:%M")
-    return f"Recordatorio programado: '{texto}' a las {hora}."
+    return f"Reminder set: '{texto}' at {hora}. It is saved and will show in JARVIS even after a restart."
+
+
+@tool
+def listar_recordatorios() -> str:
+    """List pending reminders with their ids and times."""
+    from core.reminders import reminder_store
+
+    items = reminder_store.pending()
+    if not items:
+        return "No pending reminders."
+    return "Pending reminders:\n" + "\n".join(
+        f"- [{i['id']}] {i['due'][11:16]} ({i['due'][:10]}): {i['text']}" for i in items
+    )
+
+
+@tool
+def cancelar_recordatorio(id_o_texto: str) -> str:
+    """Cancel one pending reminder by its id from listar_recordatorios or a unique word in its text."""
+    from core.reminders import reminder_store
+
+    item = reminder_store.cancel(id_o_texto)
+    if item is None:
+        return "I could not find exactly one pending reminder matching that."
+    with jarvis_state.recordatorios_lock:
+        jarvis_state._recordatorios[:] = [r for r in jarvis_state._recordatorios if r.get("texto") != item["text"]]
+    return f"Cancelled reminder: '{item['text']}'."
 
 
 # ─────────────────────────────────────────

@@ -87,6 +87,47 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 
+_INSTANCE_MUTEX_NAME = r"Local\JARVIS-Desktop-Assistant"
+_instance_mutex = None
+
+
+def acquire_single_instance() -> bool:
+    """Hold a per-user named mutex; False when another JARVIS window owns it."""
+    global _instance_mutex
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    handle = kernel32.CreateMutexW(None, False, _INSTANCE_MUTEX_NAME)
+    if not handle:
+        return True  # Cannot tell; do not block startup.
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return False
+    _instance_mutex = handle
+    return True
+
+
+def configure_startup_log():
+    """Send output to JARVIS_STARTUP_LOG when launched without a console."""
+    log_path = os.getenv("JARVIS_STARTUP_LOG", "").strip()
+    if not log_path and sys.stdout is not None:
+        return None
+    if not log_path:
+        base = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        log_path = str(Path(base) / "Jarvis" / "logs" / "startup.log")
+    try:
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+        stream = open(log_path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+    except OSError:
+        return None
+    sys.stdout = stream
+    sys.stderr = stream
+    return stream
+
+
 def is_backend_running(url):
     try:
         response = requests.get(f"{url}/api/status", timeout=1)
@@ -137,9 +178,17 @@ def start_app():
         if not is_backend_running(url):
             print("[SYSTEM] Starting backend server...")
             # Inherit stdout/stderr so startup diagnostics remain visible.
+            log_stream = sys.stdout if getattr(sys.stdout, "fileno", None) else None
+            try:
+                if log_stream is not None:
+                    log_stream.fileno()
+            except (OSError, ValueError):
+                log_stream = None
             backend_proc = subprocess.Popen(
                 [sys.executable, backend_script],
-                cwd=root_dir
+                cwd=root_dir,
+                stdout=log_stream,
+                stderr=subprocess.STDOUT if log_stream is not None else None,
             )
 
             # Wait up to 90s because local ML models can be heavy.
@@ -211,6 +260,10 @@ def start_app():
 
 
 if __name__ == "__main__":
+    configure_startup_log()
+    if not acquire_single_instance():
+        print("[SYSTEM] JARVIS is already running; not starting a second instance.")
+        sys.exit(0)
     try:
         start_app()
     except KeyboardInterrupt:

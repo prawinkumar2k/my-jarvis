@@ -2486,6 +2486,46 @@ document.addEventListener('DOMContentLoaded', () => {
         renderEmergencyStop();
     }
 
+    // Windows login auto-start (Startup-folder shortcut managed by scripts\enable-startup.ps1).
+    let autostartEnabled = false;
+
+    function renderAutostart(supported = true) {
+        const btn = document.getElementById('autostart-toggle');
+        if (!btn) return;
+        btn.hidden = !supported;
+        btn.setAttribute('aria-pressed', String(autostartEnabled));
+        btn.textContent = autostartEnabled ? t('autostart_on') : t('autostart_off');
+    }
+
+    async function toggleAutostart() {
+        const btn = document.getElementById('autostart-toggle');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/security/startup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: !autostartEnabled })
+            });
+            const data = await res.json();
+            if (typeof data.enabled === 'boolean') autostartEnabled = data.enabled;
+            ui.addLogEntry(`> AUTO-START: ${data.message || data.error || (autostartEnabled ? 'on' : 'off')}`);
+        } catch (err) {
+            ui.addLogEntry(`> AUTO-START: ${err.message}`);
+        } finally {
+            if (btn) btn.disabled = false;
+            renderAutostart();
+        }
+    }
+
+    document.getElementById('autostart-toggle')?.addEventListener('click', toggleAutostart);
+    fetch('/api/security/startup', { cache: 'no-store' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+            autostartEnabled = data?.enabled === true;
+            renderAutostart(data?.supported === true);
+        })
+        .catch(() => renderAutostart(false));
+
     document.getElementById('emergency-stop')?.addEventListener('click', () => setEmergencyStop(!emergencyStopEngaged));
     window.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x')) {

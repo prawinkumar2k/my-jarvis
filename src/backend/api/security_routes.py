@@ -132,6 +132,29 @@ async def set_emergency_stop():
     return jsonify({**_emergency_stop_payload(state), "closed_live_sessions": closed_sessions})
 
 
+@security_bp.route("/api/security/startup", methods=["GET"])
+async def get_startup():
+    from core.startup_manager import get_startup_status
+
+    return jsonify(get_startup_status().to_dict())
+
+
+@security_bp.route("/api/security/startup", methods=["POST"])
+async def set_startup():
+    """Enable ({"enabled": true, "method": "Shortcut"|"TaskScheduler"}) or disable login auto-start."""
+    import asyncio
+
+    from core.startup_manager import set_startup_enabled
+
+    data = (await request.get_json(silent=True)) or {}
+    enabled = data.get("enabled")
+    if not isinstance(enabled, bool):
+        return jsonify({"error": "Field 'enabled' must be a boolean."}), 400
+    method = str(data.get("method") or "Shortcut")
+    ok, message, status = await asyncio.to_thread(set_startup_enabled, enabled, method)
+    return jsonify({"ok": ok, "message": message, **status.to_dict()}), (200 if ok else 500)
+
+
 @security_bp.route("/api/proactive", methods=["GET"])
 async def get_proactive():
     try:

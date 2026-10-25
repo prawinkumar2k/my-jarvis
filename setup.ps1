@@ -54,23 +54,23 @@ function Get-ModelIssues {
 
 $missingModels = @(Get-ModelIssues)
 if ($missingModels.Count -gt 0) {
-    Require-Command -Name "git-lfs" -InstallCommand "winget install GitHub.GitLFS"
-    Write-Host "Required voice models are missing; downloading Git LFS files..."
-    & git lfs pull
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: Git LFS could not download the voice models." -ForegroundColor Red
-        exit 1
+    # Git LFS only works in a clone with a remote. ZIP downloads and local-only
+    # repositories fall back to Piper's official voice downloader after install.
+    $gitRemotes = @()
+    if ((Test-Path ".git") -and (Get-Command "git" -ErrorAction SilentlyContinue)) {
+        $gitRemotes = @(& git remote 2>$null)
     }
-    $missingModels = @(Get-ModelIssues)
-}
-
-if ($missingModels.Count -gt 0) {
-    Write-Host "ERROR: required model files are missing:" -ForegroundColor Red
-    $missingModels | ForEach-Object {
-        Write-Host "  $_" -ForegroundColor Red
+    if ($gitRemotes.Count -gt 0 -and (Get-Command "git-lfs" -ErrorAction SilentlyContinue)) {
+        Write-Host "Required voice models are missing; downloading Git LFS files..."
+        & git lfs pull
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "WARNING: Git LFS could not download the voice models." -ForegroundColor Yellow
+        }
+        $missingModels = @(Get-ModelIssues)
     }
-    Write-Host "Run 'git lfs pull' and retry setup." -ForegroundColor Yellow
-    exit 1
+    if ($missingModels.Count -gt 0) {
+        Write-Host "Voice models will be downloaded from the official Piper voice repository after dependencies install."
+    }
 }
 
 $webViewRoots = @(
@@ -192,6 +192,23 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Failed to install core dependencies." -ForegroundColor Red
     exit 1
+}
+
+if ($missingModels.Count -gt 0) {
+    $voiceNames = @(
+        $missingModels |
+            ForEach-Object { [System.IO.Path]::GetFileName(($_ -split ' ')[0]) -replace '\.onnx(\.json)?$', '' } |
+            Sort-Object -Unique
+    )
+    Write-Host "Downloading Piper voices: $($voiceNames -join ', ')"
+    & $venvPython -m piper.download_voices @voiceNames --download-dir models --force-redownload
+    $missingModels = @(Get-ModelIssues)
+    if ($LASTEXITCODE -ne 0 -or $missingModels.Count -gt 0) {
+        Write-Host "ERROR: required voice model files are missing:" -ForegroundColor Red
+        $missingModels | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+        Write-Host "Check your internet connection and rerun setup." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 if ($Full) {

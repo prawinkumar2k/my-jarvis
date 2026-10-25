@@ -102,6 +102,17 @@ J.A.R.V.I.S. defaults to **Core Mode**, keeping the desktop, voice, memory, comp
 
 ---
 
+## 🆕 This Fork: Tamil, File Tools, Emergency Stop
+
+- **Tamil, Thanglish and English** in one conversation. Each message is classified (Tamil script, Thanglish, English, Spanish) and JARVIS replies the same way; code, paths and commands stay untouched. Select **TA** for Tamil speech recognition (`ta-IN` / Whisper `ta`). No local Tamil voice is bundled: spoken Tamil replies need Gemini Live.
+- **File tools** confined to `JARVIS_FILE_WRITE_ROOTS`: list, search, system info, Windows Settings pages, organize with preview; opt-in create/copy/move/rename/delete (Recycle Bin) with confirmation for destructive actions. Credential files are never visible.
+- **Emergency stop**: header **STOP** button or `Ctrl+Shift+X` blocks every tool, closes live voice and stops playback.
+- **ZIP installs work**: setup downloads the Piper voices when Git LFS is unavailable.
+
+Status, limits and test evidence: [Feature matrix](docs/FEATURE_MATRIX.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Test report](docs/TEST_REPORT.md) · [Windows install](docs/INSTALLATION_WINDOWS.md) · [Configuration](docs/CONFIGURATION.md) · [Security](docs/SECURITY.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Architecture](docs/ARCHITECTURE.md)
+
+---
+
 ## ⚡ Quick Start — Windows
 
 If you only want to run J.A.R.V.I.S., you do not need to set up a development environment manually.

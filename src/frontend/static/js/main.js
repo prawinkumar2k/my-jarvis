@@ -143,8 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const SUPPORTED_LANGUAGES = ['en', 'es', 'ta'];
+
     function getRecognitionLang(langCode = currentLang) {
-        return String(langCode || 'en').toLowerCase() === 'es' ? 'es-ES' : 'en-US';
+        const code = String(langCode || 'en').toLowerCase();
+        if (code === 'es') return 'es-ES';
+        if (code === 'ta') return 'ta-IN';
+        return 'en-US';
     }
 
     function applyRecognitionLanguage(langCode = currentLang) {
@@ -160,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
             storedLanguage = '';
         }
-        if (storedLanguage === 'en' || storedLanguage === 'es') {
+        if (SUPPORTED_LANGUAGES.includes(storedLanguage)) {
             await applyLanguageSetting(storedLanguage);
             return;
         }
@@ -604,7 +609,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function applyLanguageSetting(newLang) {
-        newLang = String(newLang || '').toLowerCase() === 'en' ? 'en' : 'es';
+        newLang = String(newLang || '').toLowerCase();
+        if (!SUPPORTED_LANGUAGES.includes(newLang)) newLang = 'es';
         document.documentElement.lang = newLang;
         setLanguage(newLang);
         applyRecognitionLanguage(newLang);
@@ -663,7 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function hasStoredLanguageChoice() {
         try {
             const language = localStorage.getItem('jarvis_lang');
-            return language === 'en' || language === 'es';
+            return SUPPORTED_LANGUAGES.includes(language);
         } catch {
             return false;
         }

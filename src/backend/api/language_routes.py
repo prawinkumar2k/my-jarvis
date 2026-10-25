@@ -13,6 +13,7 @@ from quart import Blueprint, jsonify, request
 from utils.jarvis_i18n import (
     LANGUAGE_CONFIG,
     get_model_path,
+    has_native_tts,
     set_current_language,
 )
 
@@ -68,7 +69,10 @@ async def get_language():
     current = getattr(_jarvis_settings, "LANGUAGE", get_app_config().localization.language)
     if current not in LANGUAGE_CONFIG:
         current = "en"
-    available = {code: {"name": cfg["name"], "locale": cfg["locale"]} for code, cfg in LANGUAGE_CONFIG.items()}
+    available = {
+        code: {"name": cfg["name"], "locale": cfg["locale"], "local_tts_native": has_native_tts(code)}
+        for code, cfg in LANGUAGE_CONFIG.items()
+    }
     return jsonify(
         {
             "current": current,
@@ -155,6 +159,7 @@ async def set_language():
         "locale": cfg["locale"],
         "name": cfg["name"],
         "tts_swapped": tts_ok,
+        "local_tts_native": has_native_tts(lang),
     }
     res_contract = validate_language_response(payload)
     if not res_contract.ok:

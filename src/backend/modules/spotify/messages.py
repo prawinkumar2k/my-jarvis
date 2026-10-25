@@ -4,7 +4,7 @@ from utils.jarvis_i18n import get_current_language
 
 
 def is_english() -> bool:
-    return get_current_language().startswith("en")
+    return not get_current_language().startswith("es")
 
 
 def text(en: str, es: str) -> str:

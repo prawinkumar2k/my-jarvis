@@ -108,7 +108,7 @@ If you only want to run J.A.R.V.I.S., you do not need to set up a development en
 
 ### 1. Download
 
-Build a Windows release package locally with `.\scripts\build_windows_release.ps1 -Version <version>` (details in `AGENTS.md` under *Windows Release Package*), or run directly from this source folder.
+Build a Windows release package locally with `.\scripts\build_windows_release.ps1 -Version 0.1.0-alpha.4` (this fork is based on upstream release v0.1.0-alpha.4; details in `AGENTS.md` under *Windows Release Package*), or run directly from this source folder.
 
 ### 2. Install
 

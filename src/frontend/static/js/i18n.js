@@ -388,6 +388,43 @@ export const translations = {
     }
 };
 
+// Tamil UI labels. Keys without a Tamil string fall back to English in t().
+translations.ta = {
+    "init_text": "J.A.R.V.I.S. தொடங்குகிறது",
+    "system_online": "அமைப்பு இயங்குகிறது",
+    "language_label": "இடைமுக மொழி",
+    "privacy_local": "உள்ளூர்",
+    "diagnostics_label": "கண்டறிதல்",
+    "metrics_title": "அமைப்பு அளவீடுகள்",
+    "env_title": "சூழல்",
+    "default_transcript": "\"உங்கள் கட்டளைக்காக காத்திருக்கிறேன்.\"",
+    "conversation_panel_title": "உரையாடல்",
+    "conversation_empty": "உங்கள் உரையாடல்கள் இங்கே தோன்றும். தட்டச்சு செய்யவும் அல்லது குரலை இயக்கவும்.",
+    "conversation_user": "நீங்கள்",
+    "conversation_jarvis": "JARVIS",
+    "conversation_system": "அமைப்பு",
+    "onboarding_label": "முதல் அமைப்பு",
+    "onboarding_progress_welcome": "படி 1 / 3",
+    "onboarding_progress_provider": "படி 2 / 3",
+    "onboarding_progress_command": "படி 3 / 3",
+    "onboarding_progress_success": "அமைப்பு முடிந்தது",
+    "onboarding_language_label": "JARVIS மொழி",
+    "onboarding_continue": "தொடரவும்",
+    "onboarding_skip": "இப்போது தவிர்",
+    "onboarding_provider_title": "AI வழங்குநரைத் தேர்ந்தெடுக்கவும்",
+    "onboarding_key_label": "API key",
+    "onboarding_back": "பின்செல்",
+    "onboarding_configure": "சரிபார்த்து சேமி",
+    "onboarding_command_title": "உங்கள் முதல் கட்டளையை முயற்சிக்கவும்",
+    "onboarding_command_suggestion": "வெளி கணக்குகளை அணுகாமல் நீ என்ன செய்ய முடியும் என்று விளக்கு.",
+    "onboarding_success_title": "JARVIS தயார்",
+    "onboarding_finish": "JARVIS-க்கு தொடரவும்",
+    "btn_init_voice": "குரலை இயக்கு",
+    "btn_stop_voice": "குரல் இணைப்பை மூடு",
+    "command_placeholder": "JARVIS-க்கு கட்டளை எழுதுங்கள் (தமிழ், Thanglish அல்லது English)",
+    "mode_processing": "செயலாக்குகிறது...",
+};
+
 export let currentLang = localStorage.getItem("jarvis_lang") || "es";
 
 export function setLanguage(lang, { persist = true } = {}) {

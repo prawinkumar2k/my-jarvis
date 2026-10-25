@@ -45,7 +45,7 @@ class TelegramManager:
         self._obs_event = None
 
     def _text(self, en: str, es: str) -> str:
-        return en if get_current_language().startswith("en") else es
+        return en if not get_current_language().startswith("es") else es
 
     def _whisper_language(self) -> str:
         try:

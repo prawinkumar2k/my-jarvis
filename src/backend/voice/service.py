@@ -419,7 +419,7 @@ def _transcribe_command(
 
 
 def _voice_is_english() -> bool:
-    return get_current_language().startswith("en")
+    return not get_current_language().startswith("es")
 
 
 def _voice_text(en: str, es: str) -> str:

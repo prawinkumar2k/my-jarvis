@@ -10,6 +10,7 @@ from langchain_core.messages import SystemMessage
 from services import security_manager
 from utils.jarvis_auth import es_guest, get_auth_snapshot, verificar_autorizacion
 from utils.jarvis_i18n import BACKEND_TRANSLATIONS, get_current_language
+from utils.language_detection import build_response_language_directive
 
 if jarvis_config.ROOT_DIR not in sys.path:
     sys.path.insert(0, jarvis_config.ROOT_DIR)
@@ -26,6 +27,17 @@ except ImportError:
         LOCATION = "TU_CIUDAD, TU_PAIS"
         GUEST_PROMPT = ""
         OWNER_PROMPT = ""
+
+
+# Fixed language locks in the translated prompts; replaced by the per-turn policy.
+_LANGUAGE_LOCKS = ("You MUST reply in English.", "DEBES responder en Español.")
+
+
+def _apply_language_policy(content: str, user_input: str, lang: str) -> str:
+    directive = build_response_language_directive(user_input, lang)
+    for lock in _LANGUAGE_LOCKS:
+        content = content.replace(lock, "Follow the LANGUAGE POLICY at the end of these instructions.")
+    return f"{content}\n\n{directive}"
 
 
 def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMessage:
@@ -112,7 +124,7 @@ def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMess
             nombre_activo=_nombre_activo,
             memoria_texto=memoria_texto,
         )
-        return SystemMessage(content=content)
+        return SystemMessage(content=_apply_language_policy(content, user_input, lang))
 
     # Mensaje para el Administrador (owner)
     with security_manager.SECURITY_LOCK:
@@ -132,4 +144,4 @@ def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMess
         strict_status=strict_status,
         memoria_texto=memoria_texto,
     )
-    return SystemMessage(content=content)
+    return SystemMessage(content=_apply_language_policy(content, user_input, lang))

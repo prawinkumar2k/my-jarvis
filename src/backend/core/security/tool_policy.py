@@ -77,6 +77,18 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "buscar_en_boveda": ToolPolicy("buscar_en_boveda", "elevated", ("admin",), False, True),
     "busqueda_semantica_hibrida": ToolPolicy("busqueda_semantica_hibrida", "elevated", ("admin",), False, True),
     "consultar_memoria_jit": ToolPolicy("consultar_memoria_jit", "elevated", ("admin",), False, True),
+    # File management (tools/files.py). Reads and reversible creates are elevated;
+    # moving, renaming, organizing and deleting require explicit confirmation.
+    "listar_carpeta": ToolPolicy("listar_carpeta", "elevated", ("admin",), False, True),
+    "buscar_archivos": ToolPolicy("buscar_archivos", "elevated", ("admin",), False, True),
+    "previsualizar_organizacion": ToolPolicy("previsualizar_organizacion", "elevated", ("admin",), False, True),
+    "abrir_configuracion_windows": ToolPolicy("abrir_configuracion_windows", "elevated", ("admin",), False, True),
+    "crear_carpeta": ToolPolicy("crear_carpeta", "elevated", ("admin",), False, True),
+    "copiar_archivo": ToolPolicy("copiar_archivo", "elevated", ("admin",), False, True),
+    "mover_archivo": ToolPolicy("mover_archivo", "critical", ("admin",), True, True),
+    "renombrar_archivo": ToolPolicy("renombrar_archivo", "critical", ("admin",), True, True),
+    "organizar_carpeta": ToolPolicy("organizar_carpeta", "critical", ("admin",), True, True),
+    "eliminar_archivo": ToolPolicy("eliminar_archivo", "critical", ("admin",), True, True),
 }
 
 

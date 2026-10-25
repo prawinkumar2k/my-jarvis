@@ -148,7 +148,7 @@ def _mapear_weather_code_openmeteo(code: int, lang: str = "es") -> str:
         96: "Storm",
         99: "Strong storm",
     }
-    tabla = tabla_en if str(lang or "").lower().startswith("en") else tabla_es
+    tabla = tabla_en if not str(lang or "").lower().startswith("es") else tabla_es
     default_desc = "Clear" if tabla is tabla_en else "Despejado"
     return tabla.get(int(code), default_desc)
 
@@ -313,7 +313,7 @@ def _format_weather_temperature(temp: str, lang: str) -> str:
     temp_value = _temperature_to_float(temp)
     if temp_value is None:
         return ""
-    if str(lang or "").lower().startswith("en"):
+    if not str(lang or "").lower().startswith("es"):
         return f"{round((temp_value * 9.0 / 5.0) + 32.0)} degrees Fahrenheit"
     return f"{round(temp_value)} grados Celsius"
 
@@ -369,7 +369,7 @@ def _obtener_clima_logic(ciudad: str | None = None) -> tuple[str, str]:
             use_configured_coordinates=use_configured_coordinates,
         )
         if coordinates is None:
-            not_found = "Location not found" if lang.startswith("en") else "Ubicación no encontrada"
+            not_found = "Location not found" if not lang.startswith("es") else "Ubicación no encontrada"
             return not_found, "--"
         lat, lon = coordinates
         max_retries = 2
@@ -414,7 +414,7 @@ def _obtener_clima_logic(ciudad: str | None = None) -> tuple[str, str]:
         from tools.search import buscar_en_internet  # noqa: PLC0415
 
         weather_query = (
-            f"current weather in {ciudad_actual}" if lang.startswith("en") else f"clima actual en {ciudad_actual}"
+            f"current weather in {ciudad_actual}" if not lang.startswith("es") else f"clima actual en {ciudad_actual}"
         )
         res = str(buscar_en_internet.invoke({"query": weather_query}))
         temp = _extract_celsius_from_weather_text(res)
@@ -433,7 +433,7 @@ def obtener_clima(ciudad: str = "Madrid") -> str:
     lang = get_current_language()
     desc, temp = _obtener_clima_logic(ciudad)
     temp_label = _format_weather_temperature(temp, lang)
-    if lang.startswith("en"):
+    if not lang.startswith("es"):
         if not temp_label:
             return f"Weather in {ciudad}: {desc}"
         return f"The weather in {ciudad} is {desc}, with a temperature of {temp_label}."
@@ -920,14 +920,14 @@ def generar_resumen_noticias(forzar: bool = False):
         return
 
     try:
-        print("[JARVIS] Generating briefing..." if lang.startswith("en") else "[JARVIS] Generating briefing...")
+        print("[JARVIS] Generating briefing..." if not lang.startswith("es") else "[JARVIS] Generating briefing...")
         nc["listo"] = False
         nc["language"] = lang
         titulares = obtener_noticias_newsapi(lang)
         if not titulares:
             nc["resumen"] = (
                 "I could not retrieve the briefing right now, Administrator."
-                if lang.startswith("en")
+                if not lang.startswith("es")
                 else "No fue posible obtener el briefing en este momento, Administrador."
             )
             nc["listo"] = True
@@ -948,7 +948,7 @@ def generar_resumen_noticias(forzar: bool = False):
             else:
                 nc["resumen"] = (
                     "Briefing cancelled: LLM did not initialize."
-                    if lang.startswith("en")
+                    if not lang.startswith("es")
                     else "Briefing cancelado: LLM no inicializó."
                 )
                 nc["listo"] = True
@@ -956,7 +956,7 @@ def generar_resumen_noticias(forzar: bool = False):
             return
 
         hoy_label = datetime.now().strftime("%B %d, %Y")
-        if lang.startswith("en"):
+        if not lang.startswith("es"):
             prompt = (
                 f"You are JARVIS. Today is {hoy_label}. Summarize these headlines in at most 5 short sentences "
                 "covering technology, sports, economy, international politics, Mexico, science, and cybersecurity. "
@@ -987,7 +987,7 @@ def generar_resumen_noticias(forzar: bool = False):
         print(bt["log_briefing_ready"])
     except Exception as e:
         nc["resumen"] = (
-            "I could not generate the briefing." if lang.startswith("en") else "No fue posible obtener el briefing."
+            "I could not generate the briefing." if not lang.startswith("es") else "No fue posible obtener el briefing."
         )
         nc["listo"] = True
         nc["language"] = lang

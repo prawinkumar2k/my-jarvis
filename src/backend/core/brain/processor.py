@@ -202,7 +202,7 @@ def _resolve_pending_spotify_selection(
     if resolution is None or resolution.status is SpotifySelectionStatus.UNRELATED:
         return None, False
 
-    english = get_current_language().startswith("en")
+    english = not get_current_language().startswith("es")
     if resolution.status is SpotifySelectionStatus.CANCELLED:
         return ("Spotify selection cancelled." if english else "Selección de Spotify cancelada."), False
     if resolution.status is SpotifySelectionStatus.CLARIFY:
@@ -270,7 +270,7 @@ def _resolve_pending_auth_confirmation(
     )
     if is_cancellation:
         history_manager._extraer_accion_pendiente_auth(pid, pop=True)
-        english = get_current_language().startswith("en")
+        english = not get_current_language().startswith("es")
         return ("Action cancelled." if english else "Acción cancelada."), False
 
     is_affirmative = (
@@ -360,11 +360,11 @@ def _preflight(
         if nc and nc.get("resumen") and nc.get("listo"):
             resumen = re.sub(r"<think>.*?</think>", "", nc["resumen"], flags=re.DOTALL)
             resumen = re.sub(r"\s+", " ", resumen).strip()
-            prefix = "Daily news briefing" if get_current_language().startswith("en") else "Resumen diario de noticias"
+            prefix = "Daily news briefing" if not get_current_language().startswith("es") else "Resumen diario de noticias"
             return f"{prefix}: {resumen}", False
         return (
             "The briefing is still being generated. One moment."
-            if get_current_language().startswith("en")
+            if not get_current_language().startswith("es")
             else "El resumen de noticias todavía se está generando. Un momento."
         ), False
 

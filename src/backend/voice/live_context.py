@@ -6,6 +6,8 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+from utils.language_detection import build_live_language_directive
+
 _SECRET_PATTERN = re.compile(r"\b(?:AIza|gsk_)[A-Za-z0-9_-]{6,}\b")
 _CREDENTIAL_QUERY_PATTERN = re.compile(
     r"(?i)(?P<name>key|api_key|token|access_token)=(?P<value>[^&\s]+)"
@@ -45,9 +47,7 @@ def _message_line(message: object) -> str:
 
 
 def _language_directive(language: str) -> str:
-    if str(language or "").strip().lower().startswith("es"):
-        return "RESPONDE INEQUÍVOCAMENTE EN ESPAÑOL."
-    return "RESPOND UNMISTAKABLY IN ENGLISH."
+    return build_live_language_directive(language)
 
 
 def build_live_context(

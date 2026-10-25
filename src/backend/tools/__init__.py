@@ -75,6 +75,17 @@ _LAZY_EXPORTS = {
         "tools.utilities",
         "evaluar_expresion_matematica",
     ),
+    "listar_carpeta": ("tools.files", "listar_carpeta"),
+    "buscar_archivos": ("tools.files", "buscar_archivos"),
+    "informacion_sistema": ("tools.files", "informacion_sistema"),
+    "abrir_configuracion_windows": ("tools.files", "abrir_configuracion_windows"),
+    "previsualizar_organizacion": ("tools.files", "previsualizar_organizacion"),
+    "crear_carpeta": ("tools.files", "crear_carpeta"),
+    "copiar_archivo": ("tools.files", "copiar_archivo"),
+    "mover_archivo": ("tools.files", "mover_archivo"),
+    "renombrar_archivo": ("tools.files", "renombrar_archivo"),
+    "eliminar_archivo": ("tools.files", "eliminar_archivo"),
+    "organizar_carpeta": ("tools.files", "organizar_carpeta"),
     "crear_archivo_texto": ("tools.system", "crear_archivo_texto"),
     "ejecutar_comando_terminal": ("tools.system", "ejecutar_comando_terminal"),
     "computer_click": ("tools.computer_use", "computer_click"),
@@ -109,6 +120,17 @@ _OPT_IN_SYSTEM_TOOLS = frozenset(
         "ejecutar_comando_terminal",
     }
 )
+_OPT_IN_FILE_TOOLS = frozenset(
+    {
+        "crear_carpeta",
+        "copiar_archivo",
+        "mover_archivo",
+        "renombrar_archivo",
+        "eliminar_archivo",
+        "organizar_carpeta",
+    }
+)
+
 __all__ = ["get_base_tools"]
 __all__.extend(_BASE_TOOL_NAMES)
 
@@ -130,7 +152,18 @@ def _get_base_tools_impl():
         "yes",
         "on",
     }
-    return [__getattr__(name) for name in _BASE_TOOL_NAMES if system_tools_enabled or name not in _OPT_IN_SYSTEM_TOOLS]
+    file_tools_enabled = system_tools_enabled or str(os.getenv("JARVIS_FILE_TOOLS_ENABLED") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    return [
+        __getattr__(name)
+        for name in _BASE_TOOL_NAMES
+        if (system_tools_enabled or name not in _OPT_IN_SYSTEM_TOOLS)
+        and (file_tools_enabled or name not in _OPT_IN_FILE_TOOLS)
+    ]
 
 
 def get_base_tools():

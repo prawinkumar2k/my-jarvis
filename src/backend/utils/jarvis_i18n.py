@@ -60,7 +60,24 @@ LANGUAGE_CONFIG = {
         "locale": "es-ES",
         "name": "Español",
     },
+    "ta": {
+        # No Tamil Piper voice is bundled. Local TTS keeps the English voice
+        # unless JARVIS_TTS_MODEL_TA points at a Tamil-capable .onnx model;
+        # Gemini Live speaks Tamil natively through its own audio output.
+        "tts_model": "en_GB-northern_english_male-medium.onnx",
+        "tts_model_env": "JARVIS_TTS_MODEL_TA",
+        "tts_native": False,
+        "whisper_lang": "ta",
+        "locale": "ta-IN",
+        "name": "தமிழ் (Tamil)",
+    },
 }
+
+
+def has_native_tts(lang: str) -> bool:
+    """True when local TTS has a voice model meant for this language."""
+    cfg = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG["en"])
+    return bool(cfg.get("tts_native", True) or os.getenv(cfg["tts_model_env"], "").strip())
 
 
 def get_model_path(lang: str) -> str:
@@ -634,4 +651,17 @@ Estas son memorias reales. Úsalas con naturalidad. Si el usuario activo no es e
         "log_morning_briefing": "  [SCHEDULER] Lanzando briefing matutino programado...",
         "log_ready_to_serve": "Listo para servir.",
     },
+}
+
+# Prompts stay in English for Tamil mode; the per-turn LANGUAGE POLICY line
+# (utils.language_detection) decides between Tamil script, Thanglish and English.
+BACKEND_TRANSLATIONS["ta"] = {
+    **BACKEND_TRANSLATIONS["en"],
+    "social_online_admin": "ஆன்லைனில் இருக்கிறேன். நான் எப்படி உதவலாம்?",
+    "social_online_guest": "ஆன்லைனில் இருக்கிறேன், {name}. நான் எப்படி உதவலாம்?",
+    "social_status_admin": "எல்லாம் சரியாக இயங்குகிறது. நான் எப்படி உதவலாம்?",
+    "social_status_guest": "எல்லாம் சரியாக இயங்குகிறது, {name}. நான் எப்படி உதவலாம்?",
+    "social_thanks_admin": "உங்கள் சேவையில், Administrator.",
+    "social_thanks_guest": "மகிழ்ச்சி, {name}.",
+    "morning_greeting": "காலை வணக்கம்",
 }

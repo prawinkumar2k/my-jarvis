@@ -177,13 +177,13 @@ _BROAD_WEATHER_REGIONS = frozenset(
 
 
 def _lang_is_english() -> bool:
-    return get_current_language().startswith("en")
+    return not get_current_language().startswith("es")
 
 
 def _language_is_english(language: str | None = None) -> bool:
     if language is None:
         return _lang_is_english()
-    return str(language).strip().lower().startswith("en")
+    return not str(language).strip().lower().startswith("es")
 
 
 def _localized_time(now, language: str | None = None) -> str:

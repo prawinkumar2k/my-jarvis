@@ -20,7 +20,7 @@ def _clean_search_field(value: object) -> str:
 
 def _web_unavailable_message(status_code: int | None = None) -> str:
     suffix = f" (HTTP {status_code})" if status_code is not None else ""
-    if get_current_language().startswith("en"):
+    if not get_current_language().startswith("es"):
         return f"Web search is temporarily unavailable{suffix}."
     return f"La búsqueda web no está disponible temporalmente{suffix}."
 

@@ -118,7 +118,8 @@ def test_onboarding_copy_and_adaptive_css_are_complete():
         "onboarding_complete_setup",
         "onboarding_replay",
     ):
-        assert i18n.count(f'"{key}"') == 2
+        # en and es must be complete; the partial Tamil table may add a third.
+        assert i18n.count(f'"{key}"') >= 2
     for contract in (
         ".onboarding-rail",
         ".provider-options",

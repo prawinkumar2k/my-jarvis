@@ -16,6 +16,14 @@
 `GET /api/language` returns `local_tts_native` per language so the UI and you
 can see when Tamil mode is using the English local voice.
 
+## Interface language
+
+The UI defaults to **TA**, and the TA interface is written entirely in **Thanglish**
+(Tamil in English letters, e.g. "Command-ukku ready", "Voice on pannu", "NIRUTHU"),
+by the owner's choice. All 180 UI strings are translated; EN and ES remain
+selectable from the header. Spoken UI lines (greetings, wake replies) are also
+Thanglish, which the English local voice can pronounce.
+
 ## How replies choose a language
 
 1. Session language (`en`, `es`, `ta`) from the header selector sets recognition language, local voice, and fixed messages.

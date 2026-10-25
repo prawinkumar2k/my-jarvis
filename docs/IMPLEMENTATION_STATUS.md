@@ -19,6 +19,8 @@ Details per feature: [FEATURE_MATRIX.md](FEATURE_MATRIX.md). Evidence: [TEST_REP
 | Startup | AUTO-START toggle (API + header button) | PASS (API) / PARTIAL (button not visually checked) |
 | Language | Tamil / Thanglish / English detection and reply policy | PASS |
 | Language | Tamil fixed messages not Spanish | PASS |
+| UI | TA interface fully in Thanglish (180/180 strings), Tamil default on first launch | PASS (screenshot verified) |
+| UI | Orb animation: distinct eased states, ripples, pulse, speaking/listening wired | PASS (screenshot per state) |
 | Voice | Spoken Tamil recognition | PARTIAL |
 | Voice | Tamil speech output (Gemini Live) | PARTIAL |
 | Voice | Offline Tamil speech output | BLOCKED |

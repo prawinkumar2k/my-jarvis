@@ -266,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!nextMode || nextMode === currentMode) return;
         const prevMode = currentMode;
         currentMode = nextMode;
+        if (reactor && reactor.setVoiceMode) reactor.setVoiceMode(nextMode);
         if (VOICE_DEBUG) {
             const suffix = reason ? ` | ${reason}` : '';
             ui.addLogEntry(`> DEBUG MODE: ${prevMode} -> ${nextMode}${suffix}`);
@@ -344,7 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- HELPER WRAPPERS ---
     function addLogEntry(msg) { ui.addLogEntry(msg); }
     function setTranscript(text) { ui.setTranscript(text); }
-    function animateWaves(active) { ui.animateWaves(active); }
+    function animateWaves(active) {
+        ui.animateWaves(active);
+        if (reactor && reactor.setSpeaking) reactor.setSpeaking(active);
+    }
     function updateButtonUI(mode) { ui.updateButtonUI(mode, dom.activateBtn); }
     function getGlobalAudioContext() { return voice.getGlobalAudioContext(); }
 
@@ -610,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function applyLanguageSetting(newLang) {
         newLang = String(newLang || '').toLowerCase();
-        if (!SUPPORTED_LANGUAGES.includes(newLang)) newLang = 'es';
+        if (!SUPPORTED_LANGUAGES.includes(newLang)) newLang = 'ta';
         document.documentElement.lang = newLang;
         setLanguage(newLang);
         applyRecognitionLanguage(newLang);

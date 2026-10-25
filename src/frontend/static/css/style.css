@@ -671,6 +671,10 @@ body::before {
 }
 
 .emergency-stop {
+    font-size: 0.78rem;
+}
+
+.emergency-stop {
     background: rgba(40, 4, 8, 0.9);
     border: 1px solid #ff3b4e;
     color: #ff6b78;

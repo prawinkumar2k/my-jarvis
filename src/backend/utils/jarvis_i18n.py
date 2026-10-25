@@ -69,7 +69,7 @@ LANGUAGE_CONFIG = {
         "tts_native": False,
         "whisper_lang": "ta",
         "locale": "ta-IN",
-        "name": "தமிழ் (Tamil)",
+        "name": "Tamil (Thanglish)",
     },
 }
 
@@ -655,13 +655,14 @@ Estas son memorias reales. Úsalas con naturalidad. Si el usuario activo no es e
 
 # Prompts stay in English for Tamil mode; the per-turn LANGUAGE POLICY line
 # (utils.language_detection) decides between Tamil script, Thanglish and English.
+# Fixed greetings are Thanglish (English letters) by the owner's choice.
 BACKEND_TRANSLATIONS["ta"] = {
     **BACKEND_TRANSLATIONS["en"],
-    "social_online_admin": "ஆன்லைனில் இருக்கிறேன். நான் எப்படி உதவலாம்?",
-    "social_online_guest": "ஆன்லைனில் இருக்கிறேன், {name}. நான் எப்படி உதவலாம்?",
-    "social_status_admin": "எல்லாம் சரியாக இயங்குகிறது. நான் எப்படி உதவலாம்?",
-    "social_status_guest": "எல்லாம் சரியாக இயங்குகிறது, {name}. நான் எப்படி உதவலாம்?",
-    "social_thanks_admin": "உங்கள் சேவையில், Administrator.",
-    "social_thanks_guest": "மகிழ்ச்சி, {name}.",
-    "morning_greeting": "காலை வணக்கம்",
+    "social_online_admin": "Online-la irukken. Enna help venum?",
+    "social_online_guest": "Online-la irukken, {name}. Enna help venum?",
+    "social_status_admin": "Ellam nalla odudhu. Enna pannanum?",
+    "social_status_guest": "Ellam nalla odudhu, {name}. Enna pannanum?",
+    "social_thanks_admin": "Ungal sevaiyil, Administrator.",
+    "social_thanks_guest": "Sandhosham, {name}.",
+    "morning_greeting": "Kaalai vanakkam",
 }

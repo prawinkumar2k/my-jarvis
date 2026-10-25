@@ -175,8 +175,9 @@ def test_voice_diagnostics_have_english_and_spanish_translations():
         "live_error_live_voice_unavailable",
     }
 
+    # en, es and ta tables must all translate every diagnostic.
     for key in keys:
-        assert source.count(f'"{key}"') == 2
+        assert source.count(f'"{key}"') == 3
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required for frontend checks")

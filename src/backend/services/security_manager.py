@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from core import jarvis_config
 from core.jarvis_context import context
+from core.security import emergency_stop
 from core.security.tool_policy import evaluate_tool_policy, export_tool_policy_table
 
 # DEPENDENCY INJECTION
@@ -300,6 +301,15 @@ def _security_guard(
     source: str,
     profile_id: str | None = None,
 ) -> tuple[bool, str]:
+    if emergency_stop.is_engaged():
+        _security_audit(
+            "emergency_stop_block",
+            level="warning",
+            tool=tool_name,
+            reason="Emergency stop engaged",
+            source=source,
+        )
+        return False, "Emergency stop is active. Release it before running any action."
     with SECURITY_LOCK:
         policy = json.loads(json.dumps(SECURITY_POLICY, ensure_ascii=False, default=str))
     blocked = set(policy.get("blocked_tools") or [])

@@ -2454,6 +2454,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Emergency stop: blocks every tool on the backend and releases local audio.
+    let emergencyStopEngaged = false;
+
+    function renderEmergencyStop() {
+        const btn = document.getElementById('emergency-stop');
+        if (!btn) return;
+        btn.classList.toggle('engaged', emergencyStopEngaged);
+        btn.setAttribute('aria-pressed', String(emergencyStopEngaged));
+        btn.textContent = emergencyStopEngaged ? t('emergency_release') : t('emergency_stop');
+    }
+
+    async function setEmergencyStop(engage) {
+        if (engage) {
+            interrumpirAudio();
+            await stopLiveVoiceStream({ resumePassive: false });
+        }
+        try {
+            const res = await fetch('/api/security/emergency-stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ engaged: engage })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            emergencyStopEngaged = data.engaged === true;
+            ui.addLogEntry(emergencyStopEngaged ? t('emergency_engaged_log') : t('emergency_released_log'));
+        } catch (err) {
+            ui.addLogEntry(`> EMERGENCY STOP: ${err.message}`);
+        }
+        renderEmergencyStop();
+    }
+
+    document.getElementById('emergency-stop')?.addEventListener('click', () => setEmergencyStop(!emergencyStopEngaged));
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x')) {
+            e.preventDefault();
+            setEmergencyStop(!emergencyStopEngaged);
+        }
+    });
+    fetch('/api/security/emergency-stop', { cache: 'no-store' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+            emergencyStopEngaged = data?.engaged === true;
+            renderEmergencyStop();
+        })
+        .catch(() => renderEmergencyStop());
+
     document.getElementById('transcript')?.addEventListener('click', () => {
         if (isSpeaking) {
             interrumpirAudio();

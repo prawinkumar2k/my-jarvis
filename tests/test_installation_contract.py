@@ -139,9 +139,12 @@ def test_windows_setup_anchors_paths_and_checks_prerequisites_before_pip():
         in powershell
     )
     assert "Set-Location -LiteralPath $repoRoot" in powershell
+    # Git LFS is optional: without a remote (ZIP download), setup downloads the
+    # same Piper voices after core dependencies are installed.
+    assert "Require-Command -Name \"git-lfs\"" not in powershell
     assert (
-        powershell.index("Require-Command -Name \"git-lfs\"")
-        < powershell.index("pip install --upgrade pip")
+        powershell.index("pip install -r requirements.txt")
+        < powershell.index("-m piper.download_voices")
     )
     assert (
         powershell.index("Require-Command -Name \"ffmpeg\"")

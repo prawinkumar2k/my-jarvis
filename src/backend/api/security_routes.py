@@ -87,6 +87,51 @@ async def update_security_policy():
     )
 
 
+def _emergency_stop_payload(state) -> dict:
+    return {
+        "engaged": state.engaged,
+        "reason": state.reason,
+        "engaged_at": state.engaged_at,
+        "uninterrupted": list(state.hook_failures),
+    }
+
+
+@security_bp.route("/api/security/emergency-stop", methods=["GET"])
+async def get_emergency_stop():
+    from core.security import emergency_stop
+
+    return jsonify(_emergency_stop_payload(emergency_stop.state()))
+
+
+@security_bp.route("/api/security/emergency-stop", methods=["POST"])
+async def set_emergency_stop():
+    """Engage ({"engaged": true}) or release ({"engaged": false}) the emergency stop."""
+    from core.security import emergency_stop
+    from services.security_manager import _security_audit
+
+    data = (await request.get_json(silent=True)) or {}
+    engaged = data.get("engaged", True)
+    if not isinstance(engaged, bool):
+        return jsonify({"error": "Field 'engaged' must be a boolean."}), 400
+    state = emergency_stop.engage("user") if engaged else emergency_stop.release()
+    closed_sessions = 0
+    if engaged:
+        try:
+            from voice.live_session import live_session_manager
+
+            closed_sessions = await live_session_manager.close_all()
+        except Exception as exc:
+            print(f"[WARN emergency_stop] live session close failed: {type(exc).__name__}")
+    _security_audit(
+        "emergency_stop_engaged" if engaged else "emergency_stop_released",
+        level="critical" if engaged else "info",
+        tool="emergency_stop",
+        reason="Requested from control API",
+        source="control_panel",
+    )
+    return jsonify({**_emergency_stop_payload(state), "closed_live_sessions": closed_sessions})
+
+
 @security_bp.route("/api/proactive", methods=["GET"])
 async def get_proactive():
     try:

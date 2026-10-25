@@ -17,6 +17,7 @@ from core.command_pipeline.models import (
     ExecutionReceipt,
     ReceiptStatus,
 )
+from core.security import emergency_stop
 
 
 class ControlledToolBlockedError(PermissionError):
@@ -50,6 +51,14 @@ class ToolAuthorizationRequiredError(ControlledToolBlockedError):
     diagnostic_code = "tool_authorization_required"
     message_en = "Administrator authorization is required for that action."
     message_es = "Se requiere autorizacion de administrador para realizar esa accion."
+
+
+class EmergencyStopActiveError(ControlledToolBlockedError):
+    """The emergency stop is engaged; no tool may run until it is released."""
+
+    diagnostic_code = "emergency_stop_active"
+    message_en = "Emergency stop is active. Release it before I run any action."
+    message_es = "La parada de emergencia esta activa. Desactivala antes de ejecutar acciones."
 
 
 class ToolPolicyBlockedError(ControlledToolBlockedError):
@@ -135,6 +144,8 @@ class ToolExecutionService:
 
         started_at = datetime.now(UTC)
         try:
+            if emergency_stop.is_engaged():
+                raise EmergencyStopActiveError()
             value = self._invoke_once(request, step)
             receipt = ExecutionReceipt(
                 request_id=request.request_id,

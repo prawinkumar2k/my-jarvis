@@ -429,5 +429,14 @@ class LiveSessionManager:
             if session:
                 await session.close()
 
+    async def close_all(self) -> int:
+        """Close every live session (emergency stop). Returns how many closed."""
+        async with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+        for session in sessions:
+            await session.close()
+        return len(sessions)
+
 
 live_session_manager = LiveSessionManager()

@@ -697,6 +697,10 @@ async def _set_security_headers(response):
     )
     if request.path.rstrip("/") in {"/api/setup/status", "/api/setup/provider"}:
         response.headers["Cache-Control"] = "no-store"
+    elif request.path == "/" or request.path.startswith("/static/"):
+        # Revalidate on every load (cheap 304s) so the desktop WebView never
+        # mixes cached old modules with a newer page after an update.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

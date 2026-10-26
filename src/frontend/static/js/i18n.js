@@ -617,7 +617,19 @@ translations.ta = {
     "live_error_live_voice_unavailable": "Live voice kedaikkala. Text command center-la continue pannunga."
 };
 
-export let currentLang = localStorage.getItem("jarvis_lang") || "ta";
+// One-time reset (v2): earlier builds defaulted to Spanish/Tamil; start from English.
+try {
+    if (localStorage.getItem("jarvis_lang_version") !== "2") {
+        localStorage.removeItem("jarvis_lang");
+        localStorage.setItem("jarvis_lang_version", "2");
+    }
+} catch {
+    // Storage unavailable: defaults still apply.
+}
+
+export let currentLang = (() => {
+    try { return localStorage.getItem("jarvis_lang") || "en"; } catch { return "en"; }
+})();
 
 export function setLanguage(lang, { persist = true } = {}) {
     if (translations[lang]) {

@@ -10,8 +10,8 @@ COMPANY_NAME = "YOUR_COMPANY"
 LOCATION = "Malibu, CA"
 
 # Global Language Settings
-LANGUAGE = "ta"  # "ta" (Tamil/Thanglish), "en", "es"
-LOCALE = "ta-IN" # "ta-IN", "en-US", "es-ES"
+LANGUAGE = "en"  # "en", "ta" (Thanglish UI), "es"
+LOCALE = "en-US" # "en-US", "ta-IN", "es-ES"
 
 # ==============================================================================
 # PROMPT FOR GUESTS

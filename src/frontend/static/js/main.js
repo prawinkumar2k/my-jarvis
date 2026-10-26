@@ -614,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function applyLanguageSetting(newLang) {
         newLang = String(newLang || '').toLowerCase();
-        if (!SUPPORTED_LANGUAGES.includes(newLang)) newLang = 'ta';
+        if (!SUPPORTED_LANGUAGES.includes(newLang)) newLang = 'en';
         document.documentElement.lang = newLang;
         setLanguage(newLang);
         applyRecognitionLanguage(newLang);

@@ -44,8 +44,8 @@ if (!command.isSuccessfulCommandOutcome(undefined)) process.exit(11);
 
 def test_command_center_markup_is_accessible_and_task_first():
     html = (ROOT / "src/frontend/templates/index.html").read_text(encoding="utf-8")
-    # This fork defaults to Tamil; en/es stay selectable.
-    assert '<html lang="ta">' in html
+    # English by default; ta (Thanglish) and es stay selectable.
+    assert '<html lang="en">' in html
     assert 'id="command-form"' in html
     assert 'id="command-input"' in html
     assert 'id="command-submit"' in html

@@ -110,7 +110,8 @@ def get_response_preference() -> str:
 
 _TECH_RULE = (
     "Never translate code, commands, file names, paths, URLs, product names or "
-    "technical identifiers; keep them exactly as written."
+    "technical identifiers; keep them exactly as written. Never answer in Spanish "
+    "unless the user speaks Spanish, even if tool results are in Spanish."
 )
 
 _DIRECTIVES = {

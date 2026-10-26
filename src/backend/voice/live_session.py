@@ -70,7 +70,7 @@ class LiveSession:
         send_text: Callable[[str], Any],
         send_bytes: Callable[[bytes], Any],
         profile_id: str = "default",
-        language: str = "es",
+        language: str = "en",
         mode: str = "auto",
         audio_queue_max_chunks: int = DEFAULT_AUDIO_QUEUE_MAX_CHUNKS,
         max_audio_queue_bytes: int = DEFAULT_MAX_AUDIO_QUEUE_BYTES,
@@ -404,7 +404,7 @@ class LiveSessionManager:
         send_text: Callable[[str], Any],
         send_bytes: Callable[[bytes], Any],
         profile_id: str = "default",
-        language: str = "es",
+        language: str = "en",
         mode: str = "auto",
     ) -> LiveSession:
         async with self._lock:

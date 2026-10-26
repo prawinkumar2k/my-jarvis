@@ -210,7 +210,7 @@ export class BargeInDetector {
 
 export class LiveVoiceClient {
     constructor(options = {}) {
-        this.language = options.language || 'es';
+        this.language = options.language || 'en';
         this.profileId = options.profileId || 'default';
         this.mode = options.mode || 'auto';
         this.ws = null;

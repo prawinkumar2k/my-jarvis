@@ -419,7 +419,7 @@ async def live_voice_stream():
     from voice.live_transport import LiveTransportError
 
     session_id = str(uuid.uuid4())
-    language = websocket.args.get("lang", "es")
+    language = websocket.args.get("lang", "en")
     profile_id = websocket.args.get("profile_id", "default")
     requested_mode = websocket.args.get("mode", "auto")
 

@@ -88,6 +88,10 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "archivos_grandes": ToolPolicy("archivos_grandes", "elevated", ("admin",), False, True),
     # Clipboard: owner-only, on request only, contents never logged.
     "leer_portapapeles": ToolPolicy("leer_portapapeles", "elevated", ("admin",), False, True),
+    "ejecutar_tarea_multipaso": ToolPolicy("ejecutar_tarea_multipaso", "elevated", ("admin",), False, True),
+    "ver_tareas": ToolPolicy("ver_tareas", "elevated", ("admin",), False, True),
+    "reanudar_tarea": ToolPolicy("reanudar_tarea", "elevated", ("admin",), False, True),
+    "cancelar_tarea": ToolPolicy("cancelar_tarea", "elevated", ("admin",), False, True),
     # Everyday controls and companion tools: owner-only, reversible, audited.
     "control_multimedia": ToolPolicy("control_multimedia", "elevated", ("admin",), False, True),
     "ajustar_brillo": ToolPolicy("ajustar_brillo", "elevated", ("admin",), False, True),

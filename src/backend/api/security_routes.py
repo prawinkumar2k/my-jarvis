@@ -172,6 +172,31 @@ async def startup_briefing():
     return jsonify({"text": build_briefing(request.args.get("lang") or get_current_language(), status)})
 
 
+@security_bp.route("/api/security/tasks", methods=["GET"])
+async def list_persistent_tasks():
+    from core import task_engine
+
+    return jsonify({"tasks": await asyncio.to_thread(task_engine.list_tasks, 20)})
+
+
+@security_bp.route("/api/security/tasks/<task_id>/<action>", methods=["POST"])
+async def task_action(task_id: str, action: str):
+    """approve (control-panel confirmation), resume or cancel a persistent task."""
+    from core import task_engine
+
+    if action not in {"approve", "resume", "cancel"}:
+        return jsonify({"error": "Unknown action."}), 400
+    if task_engine.get_task(task_id) is None:
+        return jsonify({"error": "No such task."}), 404
+    if action == "cancel":
+        task = await asyncio.to_thread(task_engine.cancel_task, task_id)
+    else:
+        if action == "approve":
+            await asyncio.to_thread(task_engine.approve_step, task_id)
+        task = await asyncio.to_thread(task_engine.run_task, task_id)
+    return jsonify({"task": task, "summary": task_engine.summarize(task)})
+
+
 @security_bp.route("/api/security/reminders", methods=["GET"])
 async def reminders_status():
     """Pending reminders plus any that are due now (each due reminder is returned once)."""
@@ -194,6 +219,17 @@ async def _reminder_notification_loop(interval: float = 10.0) -> None:
         except Exception as exc:
             print(f"[WARN reminders] notification loop: {type(exc).__name__}")
         await asyncio.sleep(interval)
+
+
+@security_bp.before_app_serving
+async def _recover_tasks():
+    """Tasks that were running when JARVIS stopped become 'interrupted' (never auto-resumed)."""
+    try:
+        from core import task_engine
+
+        await asyncio.to_thread(task_engine.recover_after_restart)
+    except Exception as exc:
+        print(f"[WARN tasks] recovery failed: {type(exc).__name__}")
 
 
 @security_bp.before_app_serving

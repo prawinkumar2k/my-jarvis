@@ -20,7 +20,7 @@ the official Piper voice repository.
 One step (setup + `.env` + health check + optional login startup):
 
 ```powershell
-.\scripts\install.ps1 -EnableStartup
+.\scripts\install.ps1            # login auto-start and "Hey Jarvis" are on by default
 ```
 
 Or step by step:

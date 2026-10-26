@@ -1039,3 +1039,20 @@ def evaluar_expresion_matematica(expresion: str) -> str:
         return f"El resultado de '{expresion}' es {rendered}."
     except Exception as e:
         return f"Error al evaluar la expresión matemática: {e}"
+
+
+@tool
+def cambiar_idioma(idioma: str) -> str:
+    """Switch JARVIS's language by voice: 'english', 'tamil'/'thanglish', or 'spanish'.
+    Use for 'switch to English', 'Tamil-la pesu', 'Thanglish mode'."""
+    value = str(idioma or "").strip().lower()
+    aliases = {"english": "en", "en": "en", "tamil": "ta", "thanglish": "ta", "tanglish": "ta", "ta": "ta",
+               "spanish": "es", "español": "es", "es": "es"}
+    lang = aliases.get(value)
+    if lang is None:
+        return "Supported languages: English, Tamil (Thanglish), Spanish."
+    from api.language_routes import apply_language
+
+    apply_language(lang)
+    names = {"en": "English", "ta": "Tamil (Thanglish)", "es": "Spanish"}
+    return f"Language switched to {names[lang]}. The screen updates within a few seconds."

@@ -1,9 +1,9 @@
 # One-step install: run setup.ps1, create .env if missing, health-check the
-# backend, and optionally enable login startup.
+# backend, and enable login startup (skip with -NoStartup).
 [CmdletBinding()]
 param(
     [switch]$Full,
-    [switch]$EnableStartup,
+    [switch]$NoStartup,
     [ValidateSet("Shortcut", "TaskScheduler")]
     [string]$StartupMethod = "Shortcut"
 )
@@ -45,7 +45,7 @@ if (($check | Select-Object -Last 1) -ne "200") {
 }
 Write-Host "Health check passed (/api/status 200)."
 
-if ($EnableStartup) {
+if (-not $NoStartup) {
     & (Join-Path $PSScriptRoot "enable-startup.ps1") -Method $StartupMethod
 }
 

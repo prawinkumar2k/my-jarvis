@@ -376,11 +376,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Startup status report (time, date, battery, CPU, memory) from live system data.
+    // Same report built in the window (clock + battery API) when the backend is
+    // still busy loading models right after startup.
+    async function buildLocalBriefing(lang) {
+        const now = new Date();
+        const hour = now.getHours();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const month = now.toLocaleDateString('en-US', { month: 'long' });
+        let battery = null;
+        try {
+            if (navigator.getBattery) {
+                const b = await navigator.getBattery();
+                battery = { pct: Math.round(b.level * 100), charging: b.charging };
+            }
+        } catch (_) {
+            battery = null;
+        }
+        if (String(lang).startsWith('ta')) {
+            const days = ['Nyayiru', 'Thingal', 'Sevvai', 'Budhan', 'Vyazhan', 'Velli', 'Sani'];
+            const greet = hour < 12 ? 'Kaalai vanakkam' : (hour < 17 ? 'Madhiya vanakkam' : 'Maalai vanakkam');
+            let text = `${greet}! Ippo time ${time}, inniku ${days[now.getDay()]}kizhamai, ${now.getDate()} ${month}.`;
+            if (battery) text += ` Battery ${battery.pct} percent, ${battery.charging ? 'charge aagudhu' : 'battery-la odudhu'}.`;
+            return `${text} Ella systems-um ready. Enna pannanum?`;
+        }
+        if (String(lang).startsWith('es')) {
+            const greet = hour < 12 ? 'Buenos días' : (hour < 20 ? 'Buenas tardes' : 'Buenas noches');
+            let text = `${greet}. Son las ${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} del ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}.`;
+            if (battery) text += ` Batería al ${battery.pct} por ciento${battery.charging ? ', cargando' : ''}.`;
+            return `${text} Todos los sistemas listos.`;
+        }
+        const greet = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
+        const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+        let text = `${greet}. It is ${time}, ${day}, ${now.getDate()} ${month}.`;
+        if (battery) text += ` Battery at ${battery.pct} percent${battery.charging ? ', charging' : ''}.`;
+        return `${text} All systems ready.`;
+    }
+
     async function speakBootBriefing(fallbackText, onDone) {
         let text = fallbackText;
         try {
+            text = await buildLocalBriefing(currentLang);
+        } catch (_) {
+            text = fallbackText;
+        }
+        try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 4000);
+            const timer = setTimeout(() => controller.abort(), 5000);
             const res = await fetch(`/api/security/startup-briefing?lang=${encodeURIComponent(currentLang)}`, {
                 cache: 'no-store',
                 signal: controller.signal
@@ -860,12 +901,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeOnboarding() {
         const languageWasChosenBeforeSync = hasStoredLanguageChoice();
         await syncLanguageFromBackend();
-        const languageWasChosen = languageWasChosenBeforeSync || hasStoredLanguageChoice();
+        let languageWasChosen = languageWasChosenBeforeSync || hasStoredLanguageChoice();
         if (dom.onboardingLanguage) dom.onboardingLanguage.value = currentLang;
         try {
             setupStatusSnapshot = await API.fetchSetupStatus();
         } catch {
             setupStatusSnapshot = {};
+        }
+        // Voice-only use: a working AI key means setup is done; keep the current language.
+        if (!languageWasChosen && runtimeLlmIsAvailable()) {
+            setLanguage(currentLang);
+            languageWasChosen = true;
         }
         setupStatusSnapshot = {
             ...setupStatusSnapshot,
@@ -1192,6 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         focusText = false,
     } = {}) {
         if (!isLiveVoiceActive && !liveVoiceClient) return;
+        clearLiveIdleTimer();
         isLiveVoiceActive = false;
         if (liveVoiceClient) {
             await liveVoiceClient.disconnect();
@@ -1209,6 +1256,26 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (resumePassive) {
             startPassiveListening();
         }
+    }
+
+    // Live streams the microphone to Gemini, so it closes after a quiet period
+    // and the offline "Hey Jarvis" listener takes over again.
+    const LIVE_IDLE_MS = 45000;
+    let liveIdleTimer = null;
+
+    function clearLiveIdleTimer() {
+        clearTimeout(liveIdleTimer);
+        liveIdleTimer = null;
+    }
+
+    function armLiveIdleTimer() {
+        clearLiveIdleTimer();
+        liveIdleTimer = setTimeout(() => {
+            if (isLiveVoiceActive) {
+                ui.addLogEntry(t('live_idle_closed'));
+                void stopLiveVoiceStream({ resumePassive: false });
+            }
+        }, LIVE_IDLE_MS);
     }
 
     async function startLiveVoiceStream() {
@@ -1230,6 +1297,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         liveVoiceClient.onStateChange = (state) => {
+            if (state === 'speaking') clearLiveIdleTimer();
+            else if (state === 'listening') armLiveIdleTimer();
             if (state === 'speaking') {
                 setCurrentMode('processing', 'live_speaking');
                 if (dom.transcriptText) dom.transcriptText.textContent = t('mode_live_speaking');
@@ -1254,6 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         liveVoiceClient.onTranscript = (data) => {
+            armLiveIdleTimer();
             const role = data.role === 'assistant' ? 'jarvis' : 'user';
             const text = data.text || '';
             if (text) {
@@ -2645,6 +2715,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setTimeout(checkReminders, 4000);
     setInterval(checkReminders, 15000);
+
+    // Follow language changes made by voice ("switch to English").
+    async function followBackendLanguage() {
+        try {
+            const res = await fetch('/api/language', { cache: 'no-store' });
+            const data = res.ok ? await res.json() : null;
+            const lang = data?.current;
+            if (lang && lang !== currentLang && SUPPORTED_LANGUAGES.includes(lang)) {
+                setLanguage(lang);
+                applyRecognitionLanguage(lang);
+                if (dom.langSelector) dom.langSelector.value = lang;
+                if (hud && hud.setLocale && data.locale) hud.setLocale(data.locale);
+            }
+        } catch (_) {
+            // Try again on the next tick.
+        }
+    }
+    setInterval(followBackendLanguage, 15000);
 
     // Windows login auto-start (Startup-folder shortcut managed by scripts\enable-startup.ps1).
     let autostartEnabled = false;

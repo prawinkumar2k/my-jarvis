@@ -128,6 +128,9 @@ def test_real_engine_detects_spoken_hey_jarvis_offline(monkeypatch):
 
 def test_wake_word_preference_is_remembered(monkeypatch, tmp_path):
     monkeypatch.setattr(wake_word, "_pref_path", lambda: tmp_path / "wake_word.json")
+    monkeypatch.delenv("JARVIS_WAKE_WORD_DEFAULT", raising=False)
+    assert wake_word.remembered_enabled() is True  # on by default before any choice
+    monkeypatch.setenv("JARVIS_WAKE_WORD_DEFAULT", "false")
     assert wake_word.remembered_enabled() is False
     wake_word.remember_enabled(True)
     assert wake_word.remembered_enabled() is True

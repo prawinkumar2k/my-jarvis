@@ -168,7 +168,8 @@ def remembered_enabled() -> bool:
     try:
         return bool(json.loads(_pref_path().read_text(encoding="utf-8")).get("enabled"))
     except (OSError, ValueError):
-        return False
+        # No saved choice yet: on by default for a voice-first assistant.
+        return str(os.getenv("JARVIS_WAKE_WORD_DEFAULT") or "true").strip().lower() not in {"0", "false", "no", "off"}
 
 
 def remember_enabled(enabled: bool) -> None:

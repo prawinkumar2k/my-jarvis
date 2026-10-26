@@ -25,6 +25,7 @@ _LAZY_EXPORTS = {
     "buscar_en_wikipedia": ("tools.browser", "buscar_en_wikipedia"),
     "leer_archivo": ("tools.utilities", "leer_archivo"),
     "poner_recordatorio": ("tools.utilities", "poner_recordatorio"),
+    "cambiar_idioma": ("tools.utilities", "cambiar_idioma"),
     "listar_recordatorios": ("tools.utilities", "listar_recordatorios"),
     "cancelar_recordatorio": ("tools.utilities", "cancelar_recordatorio"),
     "reproducir_en_spotify": (

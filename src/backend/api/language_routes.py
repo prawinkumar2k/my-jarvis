@@ -63,6 +63,47 @@ def init_language_routes(config: dict):
         log_warning("AppConfig language sync failed on init", error=str(e), language=startup_lang)
 
 
+def apply_language(lang: str) -> bool:
+    """Switch the whole language stack (state, settings, TTS voice). Returns TTS swap result."""
+    cfg = LANGUAGE_CONFIG[lang]
+
+    # 1. Update centralized language state (single source of truth)
+    set_current_language(lang)
+    try:
+        set_active_language(lang)
+    except Exception as e:
+        log_warning("AppConfig language sync failed", error=str(e), language=lang)
+
+    # Also update jarvis_settings for backward compatibility
+    if _jarvis_settings:
+        _jarvis_settings.LANGUAGE = lang
+        _jarvis_settings.LOCALE = cfg["locale"]
+
+    # 2. Hot-swap TTS voice model
+    tts_ok = False
+    if _tts_engine:
+        new_model = get_model_path(lang)
+        try:
+            tts_ok = bool(_tts_engine.reload_model(new_model))
+        except Exception as e:
+            tts_ok = False
+            log_warning("TTS model swap failed", language=lang, model=new_model, error=str(e))
+        if not tts_ok:
+            log_warning("TTS model swap returned false", language=lang, model=new_model)
+
+    # 3. Whisper reads from get_current_language() at transcription time
+
+    # 4. Refresh weather immediately in the new language
+    try:
+        from tools.utilities import _obtener_clima_logic
+
+        location = get_default_location()
+        threading.Thread(target=lambda: _obtener_clima_logic(location), daemon=True).start()
+    except Exception as e:
+        log_warning("Weather refresh trigger failed", language=lang, error=str(e))
+    return tts_ok
+
+
 @language_bp.route("/api/language", methods=["GET"])
 async def get_language():
     """Returns the current language config and available languages."""
@@ -110,41 +151,7 @@ async def set_language():
 
     cfg = LANGUAGE_CONFIG[lang]
     old_lang = getattr(_jarvis_settings, "LANGUAGE", "en")
-
-    # 1. Update centralized language state (single source of truth)
-    set_current_language(lang)
-    try:
-        set_active_language(lang)
-    except Exception as e:
-        log_warning("AppConfig language sync failed", error=str(e), language=lang)
-
-    # Also update jarvis_settings for backward compatibility
-    if _jarvis_settings:
-        _jarvis_settings.LANGUAGE = lang
-        _jarvis_settings.LOCALE = cfg["locale"]
-
-    # 2. Hot-swap TTS voice model
-    tts_ok = False
-    if _tts_engine:
-        new_model = get_model_path(lang)
-        try:
-            tts_ok = bool(_tts_engine.reload_model(new_model))
-        except Exception as e:
-            tts_ok = False
-            log_warning("TTS model swap failed", language=lang, model=new_model, error=str(e))
-        if not tts_ok:
-            log_warning("TTS model swap returned false", language=lang, model=new_model)
-
-    # 3. Whisper reads from get_current_language() at transcription time
-
-    # 4. Refresh weather immediately in the new language
-    try:
-        from tools.utilities import _obtener_clima_logic
-
-        location = get_default_location()
-        threading.Thread(target=lambda: _obtener_clima_logic(location), daemon=True).start()
-    except Exception as e:
-        log_warning("Weather refresh trigger failed", language=lang, error=str(e))
+    tts_ok = apply_language(lang)
 
     log_info(
         "Language switched",

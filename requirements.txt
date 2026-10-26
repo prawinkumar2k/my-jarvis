@@ -19,6 +19,12 @@ numpy>=1.26
 soundfile>=0.12
 piper-tts==1.6.0
 
+# Offline "Hey Jarvis" wake word (on by default) and microphone capture.
+# Code Apache-2.0 / MIT; the hey_jarvis model (downloaded on first use) is
+# CC BY-NC-SA 4.0, personal non-commercial use.
+openwakeword>=0.6,<0.7
+sounddevice>=0.4,<0.6
+
 typing_extensions>=4.8; python_version < "3.11"
 
 pywebview>=4.4.1

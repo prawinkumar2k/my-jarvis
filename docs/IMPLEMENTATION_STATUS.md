@@ -16,6 +16,10 @@ Details per feature: [FEATURE_MATRIX.md](FEATURE_MATRIX.md). Evidence: [TEST_REP
 | Startup | Duplicate-instance prevention | PASS |
 | Startup | Stop / status scripts | PASS |
 | Startup | Real sign-out/sign-in auto-start | PARTIAL — manual test pending |
+| Startup | Zero-click boot: UI starts itself, speaks time/date/battery/CPU/memory report, "Hey Jarvis" restored | PASS (verified in the desktop window log) |
+| Startup | Setup screen skipped once an AI key works; wake word and login start on by default | PASS |
+| Voice | Gemini Live used for voice button and "Hey Jarvis"; closes after 45 s of silence back to offline wake word | PASS (code + tests) / PARTIAL (idle close not observed live) |
+| Voice | Language switch by voice ("switch to English", "Tamil-la pesu") | PASS (unit test) |
 | Startup | AUTO-START toggle (API + header button) | PASS (API) / PARTIAL (button not visually checked) |
 | Language | Tamil / Thanglish / English detection and reply policy | PASS |
 | Language | Tamil fixed messages not Spanish | PASS |

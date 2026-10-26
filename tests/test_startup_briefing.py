@@ -39,3 +39,15 @@ def test_collect_status_reads_live_values():
     status = collect_status()
     assert isinstance(status["now"], datetime)
     assert 0 <= status.get("cpu", 0) <= 100
+
+
+def test_voice_language_switch_tool(monkeypatch):
+    from api import language_routes
+    from tools import utilities
+
+    switched = []
+    monkeypatch.setattr(language_routes, "apply_language", lambda lang: switched.append(lang) or True)
+    assert "English" in utilities.cambiar_idioma.invoke({"idioma": "English"})
+    assert "Tamil" in utilities.cambiar_idioma.invoke({"idioma": "thanglish"})
+    assert "Supported" in utilities.cambiar_idioma.invoke({"idioma": "klingon"})
+    assert switched == ["en", "ta"]

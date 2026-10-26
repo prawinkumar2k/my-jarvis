@@ -232,10 +232,12 @@ def start_app():
 
         # 4. Start desktop app with persistent Edge Chromium storage.
         print("[SYSTEM] Opening user interface...")
-        # Let the desktop window speak without a click so it can boot hands-free.
+        # Let the desktop window speak without a click so it can boot hands-free,
+        # and skip the disk cache: the UI is served locally, and a stale cached
+        # module after an update breaks the app.
         os.environ.setdefault(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            "--autoplay-policy=no-user-gesture-required",
+            "--autoplay-policy=no-user-gesture-required --disk-cache-size=1",
         )
         gui_engine = 'edgechromium' if sys.platform == 'win32' else None
 

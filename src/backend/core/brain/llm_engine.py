@@ -17,7 +17,7 @@ from core.jarvis_config import (
     PLUGINS_ENABLED,
     VISION_ENABLED,
 )
-from core.llm_providers import provider_base_url, resolve_llm_provider_config
+from core.llm_providers import gemini_backup_model, provider_base_url, resolve_llm_provider_config
 from core.runtime_logger import log_warning
 from core.service_container import services
 from langchain_core.messages import AIMessage
@@ -336,13 +336,41 @@ class ChainedFallbackChat:
         first = self.clients[0] if self.clients else None
         self.model = getattr(first, "model", "") if first is not None else ""
         self.model_name = getattr(first, "model_name", self.model) if first is not None else ""
+        self.last_model = ""  # the model that actually answered the most recent call
+
+    @staticmethod
+    def _name(client) -> str:
+        return str(getattr(client, "last_model", "") or getattr(client, "model_name", "") or getattr(client, "model", "") or "")
 
     def invoke(self, messages, *args, **kwargs):
         last_error: Exception | None = None
         for client in self.clients:
             try:
-                return client.invoke(messages, *args, **kwargs)
+                response = client.invoke(messages, *args, **kwargs)
+                self.last_model = self._name(client)
+                return response
             except Exception as exc:  # next provider
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("no_fallback_clients")
+
+    def stream(self, messages, *args, **kwargs):
+        """Stream from the first client that works. Moves on only if a client fails
+        before sending anything, so a reply is never stitched from two models."""
+        last_error: Exception | None = None
+        for client in self.clients:
+            started = False
+            try:
+                for chunk in client.stream(messages, *args, **kwargs):
+                    if not started:
+                        self.last_model = self._name(client)
+                    started = True
+                    yield chunk
+                return
+            except Exception as exc:
+                if started:
+                    raise
                 last_error = exc
         if last_error is not None:
             raise last_error
@@ -382,6 +410,11 @@ def _build_llm_clients(provider_env: Mapping[str, str]):
         provider_config.primary_api_key,
         provider_config.primary_provider,
     )
+    backup_model = gemini_backup_model(provider_config, provider_env)
+    if backup_model:
+        primary = ChainedFallbackChat(
+            [primary, create_client(backup_model, provider_config.primary_api_key, "gemini")]
+        )
     vision = None
     if VISION_ENABLED:
         vision_model = (

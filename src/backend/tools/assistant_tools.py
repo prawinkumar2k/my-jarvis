@@ -187,9 +187,10 @@ def ping_ai(timeout: float = 15.0) -> dict:
     if worker.is_alive():
         outcome["problem"] = "timeout"
     problem = outcome.get("problem")
+    answered = str(getattr(model, "last_model", "") or "")
     return {
         "ok": problem is None,
-        "model": name,
+        "model": answered if problem is None and answered else name,
         "latency_ms": outcome.get("latency_ms"),
         "problem": problem,
         "message": LLM_FAILURE_MESSAGES.get(problem or "", "") if problem else "",

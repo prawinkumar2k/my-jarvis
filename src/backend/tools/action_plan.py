@@ -57,7 +57,9 @@ def _invoke_plan_tool(tool_name: str, args: dict, user_input: str) -> str:
 
 @tool
 def crear_plan_acciones(objetivo: str, pasos_json: str) -> str:
-    """Crea un plan supervisado de acciones locales sin ejecutarlo."""
+    """Draft a supervised plan of basic local actions WITHOUT running it (older, limited tool list).
+    For tasks the user wants run now, saved, resumed or tracked in the task panel, use
+    ejecutar_tarea_multipaso instead."""
     try:
         plan = create_action_plan(
             objetivo,

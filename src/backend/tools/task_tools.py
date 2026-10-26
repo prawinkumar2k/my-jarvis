@@ -10,7 +10,8 @@ from langchain_core.tools import tool
 
 @tool
 def ejecutar_tarea_multipaso(objetivo: str, pasos_json: str) -> str:
-    """Run a multi-step task made of existing JARVIS tools, saved so it survives restarts.
+    """Preferred tool for any multi-step task ("do X, then Y, then Z", "create a task", "saved task"):
+    runs existing JARVIS tools in order, saved so it survives restarts and shows in the task panel.
     pasos_json: JSON list like [{"tool": "abrir_aplicacion", "args": {"nombre_app": "chrome"}},
     {"tool": "organizar_ventanas", "args": {"ventanas": "Chrome, VS Code"}}] (max 12 steps).
     Risky steps pause for approval in the JARVIS control panel."""

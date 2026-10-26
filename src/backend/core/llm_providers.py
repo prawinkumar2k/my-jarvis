@@ -8,6 +8,9 @@ from dataclasses import dataclass, field
 
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 _DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"  # production on Groq; qwen3.6-27b was retired
+# Free-tier Gemini quotas are per model (gemini-2.5-flash: 20 requests/day in 2026-10), so a
+# second Gemini model keeps Gemini answering before Groq. Verified to support tool calls.
+_DEFAULT_GEMINI_BACKUP_MODEL = "gemini-3.1-flash-lite"
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,22 @@ def resolve_llm_provider_config(
         extra_fallbacks=extras,
         mode=mode,
     )
+
+
+def gemini_backup_model(config: LLMProviderConfig, env: Mapping[str, str] | None = None) -> str:
+    """Second Gemini model tried when the primary Gemini model fails ('' = none).
+
+    JARVIS_GEMINI_BACKUP_MODEL=none disables it.
+    """
+    if config.primary_provider != "gemini":
+        return ""
+    source = os.environ if env is None else env
+    model = str(source.get("JARVIS_GEMINI_BACKUP_MODEL") or _DEFAULT_GEMINI_BACKUP_MODEL).strip()
+    if model.lower() in {"none", "off", "false", "0"} or model == config.primary_model:
+        return ""
+    if not model.lower().startswith("gemini-"):
+        return ""
+    return model
 
 
 def resolve_gemini_api_key(env: Mapping[str, str] | None = None) -> str:

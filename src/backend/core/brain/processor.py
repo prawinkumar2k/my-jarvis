@@ -126,6 +126,25 @@ def _invoke_with_fallback(model, messages: list, *, event: str):
     return response
 
 
+def _stream_with_fallback(messages: list):
+    """Stream from the primary model; if it fails before the first chunk (quota, network),
+    stream from the fallback provider instead. A failure mid-reply is not retried."""
+    clients = [c for c in (brain_state.llm, brain_state.llm_fallback) if c is not None]
+    for position, client in enumerate(clients):
+        started = False
+        try:
+            for chunk in client.stream(messages):
+                started = True
+                yield chunk
+            if position:
+                obs_event("llm_fallback_succeeded", stage="stream")
+            return
+        except Exception as exc:
+            obs_event("llm_stream_failed", error=type(exc).__name__, position=position)
+            if started or position == len(clients) - 1:
+                raise LLMServiceError from None
+
+
 def _reply_needs_strict_web_retry(
     user_input: str,
     reply: str,
@@ -693,7 +712,7 @@ def _stream_procesar_mensaje_events_legacy(user_input: str, profile_id: str = DE
 
             acc = []
             in_thinking = False
-            for chunk in brain_state.llm.stream(messages):
+            for chunk in _stream_with_fallback(messages):
                 c = getattr(chunk, "content", "") or ""
                 if not c:
                     continue
@@ -728,6 +747,10 @@ def _stream_procesar_mensaje_events_legacy(user_input: str, profile_id: str = DE
             "code": "llm_unconfigured",
             "message": LLM_UNCONFIGURED_MESSAGE,
         }
+    except LLMServiceError as exc:
+        # Same specific codes as /api/chat (quota reached, bad key, timeout, offline).
+        obs_event("llm_stream_failed", error=exc.public_code)
+        yield {"type": "error", "code": exc.public_code, "message": exc.public_message}
     except Exception as exc:
         obs_event("llm_stream_failed", error=type(exc).__name__)
         yield {

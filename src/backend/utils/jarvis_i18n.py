@@ -84,6 +84,9 @@ def get_model_path(lang: str) -> str:
     """Returns the full path to the TTS model for a given language."""
     cfg = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG["en"])
     configured = os.getenv(cfg["tts_model_env"], "").strip()
+    if not configured and not cfg.get("tts_native", True):
+        # No voice for this language: reuse the configured English voice.
+        configured = os.getenv(LANGUAGE_CONFIG["en"]["tts_model_env"], "").strip()
     model_path = os.path.expandvars(os.path.expanduser(configured or cfg["tts_model"]))
     if not os.path.isabs(model_path):
         model_path = os.path.join(MODELS_DIR, model_path)

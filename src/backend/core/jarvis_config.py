@@ -279,7 +279,9 @@ BASE_DIR = _normalize_fs_path(os.path.dirname(_CORE_DIR))
 SRC_DIR = _normalize_fs_path(os.path.dirname(BASE_DIR))
 ROOT_DIR = _normalize_fs_path(os.path.dirname(SRC_DIR))
 
-load_dotenv(os.path.join(ROOT_DIR, ".env"))
+# JARVIS_SKIP_DOTENV=1 (set by the test suite) keeps a developer's .env out.
+if os.getenv("JARVIS_SKIP_DOTENV") != "1":
+    load_dotenv(os.path.join(ROOT_DIR, ".env"))
 
 RUNTIME_PATHS = ensure_runtime_paths(resolve_runtime_paths())
 RUNTIME_DIR = _normalize_fs_path(str(RUNTIME_PATHS.home))

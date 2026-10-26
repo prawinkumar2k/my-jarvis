@@ -369,6 +369,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Right after startup the backend can be busy loading models; retry instead
+    // of assuming a feature is off.
+    async function fetchJsonWithRetry(url, attempts = 12, delayMs = 1500) {
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const res = await fetch(url, { cache: 'no-store' });
+                if (res.ok) return await res.json();
+            } catch (_) {
+                // Backend not ready yet.
+            }
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+        return null;
+    }
+
     // --- SISTEMA DE ARRANQUE ---
     if (dom.loader) {
         dom.loader.querySelector('.status-msg').textContent = t('boot_click');
@@ -433,7 +448,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Keep the short greeting if the status report is unavailable.
         }
         if (text !== fallbackText) ui.addConversationSegment('jarvis', text);
-        speak(text, onDone);
+        const sentences = splitSentences(text);
+        if (sentences.length > 1) speakSentenceChain(sentences, 0, onDone);
+        else speak(text, onDone);
     }
 
     let bootStarted = false;
@@ -909,7 +926,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setupStatusSnapshot = {};
         }
         // Voice-only use: a working AI key means setup is done; keep the current language.
-        if (!languageWasChosen && runtimeLlmIsAvailable()) {
+        const llmState = String(setupStatusSnapshot?.capabilities?.llm?.state || '').toLowerCase();
+        if (!languageWasChosen && (runtimeLlmIsAvailable() || llmState === 'degraded')) {
             setLanguage(currentLang);
             languageWasChosen = true;
         }
@@ -923,7 +941,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
             },
         };
-        const initialStage = resolveInitialStage(setupStatusSnapshot, readOnboardingState());
+        const keyConfigured = runtimeLlmIsAvailable() || llmState === 'degraded';
+        const initialStage = keyConfigured
+            ? ONBOARDING_STAGES.HIDDEN
+            : resolveInitialStage(setupStatusSnapshot, readOnboardingState());
         renderOnboarding(initialStage);
     }
 
@@ -1844,8 +1865,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Gemini Live (cloud, real-time, understands Tamil/Thanglish) is preferred
     // over local Whisper, which needs a large model download and is slow on CPU.
     let liveVoicePreferred = false;
-    fetch('/api/status', { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
+    fetchJsonWithRetry('/api/status')
         .then((data) => {
             liveVoicePreferred = String(data?.capabilities?.live_voice?.state || '').toLowerCase() === 'available';
         })
@@ -2141,7 +2161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ui.updateAssistantSegment(statusText);
                         }
                     } else if (ev.type === 'done') {
-                        finalReply = ev.response || acc || '';
+                        finalReply = ev.response || ev.text || acc || '';
                         finalOutcome = ev.outcome || '';
                         shouldListen = !!ev.should_listen;
                         gotDone = true;
@@ -2213,6 +2233,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.length > 0 ? parts : (cleaned.length > 2 ? [cleaned] : []);
     }
 
+    // Synthesize the next sentence while the current one plays (no gaps).
+    const ttsPrefetch = new Map();
+    function prefetchTts(text) {
+        const key = String(text || '').trim();
+        if (!key || ttsPrefetch.has(key)) return;
+        ttsPrefetch.set(key, fetch(TTS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: key })
+        }).then(async (res) => {
+            const type = res.headers.get('content-type') || '';
+            return res.ok && type.includes('audio') ? await res.blob() : null;
+        }).catch(() => null));
+        if (ttsPrefetch.size > 8) ttsPrefetch.delete(ttsPrefetch.keys().next().value);
+    }
+
+    function splitSentences(text) {
+        return String(text || '').match(/[^.!?]+[.!?]*/g)?.map((s) => s.trim()).filter(Boolean) || [];
+    }
+
     async function speakSentenceChain(sentences, index, callback) {
         const isFirstSentence = index === 0;
         if (isFirstSentence) {
@@ -2237,6 +2277,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return speakSentenceChain(sentences, index + 1, callback);
         }
         addLogEntry(`> TTS: Hablando ${index + 1}/${sentences.length}: "${sentences[index].substring(0, 50)}"`);
+        if (sentences[index + 1]) prefetchTts(sentences[index + 1]);
         speak(sentences[index], (ok) => {
             if (chainToken !== ttsChainToken) return;
             if (!ok && index < sentences.length - 1) {
@@ -2410,7 +2451,13 @@ document.addEventListener('DOMContentLoaded', () => {
             activeTtsController = ttsController;
             const ttsTimer = setTimeout(() => { isTimeout = true; ttsController.abort(); }, 28000);
             let response;
-            try {
+            const pending = ttsPrefetch.get(String(text || '').trim());
+            const prefetched = pending ? await pending : null;
+            if (pending) ttsPrefetch.delete(String(text || '').trim());
+            if (prefetched) {
+                clearTimeout(ttsTimer);
+                response = new Response(prefetched, { headers: { 'content-type': 'audio/wav' } });
+            } else try {
                 response = await fetch(TTS_API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2685,8 +2732,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('wakeword-toggle')?.addEventListener('click', toggleWakeword);
     // Sync with the backend: the listener may already be on (enabled earlier or by script).
-    fetch('/api/security/wakeword', { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
+    fetchJsonWithRetry('/api/security/wakeword')
         .then((data) => {
             wakewordEnabled = data?.listening === true;
             const last = (data?.events || []).slice(-1)[0];
@@ -2766,8 +2812,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('autostart-toggle')?.addEventListener('click', toggleAutostart);
-    fetch('/api/security/startup', { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
+    fetchJsonWithRetry('/api/security/startup')
         .then((data) => {
             autostartEnabled = data?.enabled === true;
             renderAutostart(data?.supported === true);
@@ -2781,8 +2826,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setEmergencyStop(!emergencyStopEngaged);
         }
     });
-    fetch('/api/security/emergency-stop', { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
+    fetchJsonWithRetry('/api/security/emergency-stop')
         .then((data) => {
             emergencyStopEngaged = data?.engaged === true;
             renderEmergencyStop();

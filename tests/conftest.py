@@ -26,6 +26,9 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 os.environ.setdefault("GROQ_API_KEY", "test-key-smoke")
+# Never read the developer's real .env during tests (keys and feature flags
+# would leak into results, including test subprocesses); CI has no .env either.
+os.environ["JARVIS_SKIP_DOTENV"] = "1"
 # Keep a developer's real Gemini key (loaded from .env by load_dotenv, which
 # never overrides existing variables) out of the test run.
 os.environ["GEMINI_API_KEY"] = ""

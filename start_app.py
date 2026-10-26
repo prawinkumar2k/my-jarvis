@@ -41,6 +41,11 @@ def _relaunch_in_project_venv(root: Path = ROOT_DIR) -> bool:
     project_python = os.path.normcase(os.path.realpath(candidate))
     if current_python == project_python:
         return False
+    # pythonw.exe from the same venv is already correct; switching to python.exe
+    # would open a console window and show the app under the Python icon.
+    windowless = os.path.normcase(os.path.realpath(candidate.with_name("pythonw.exe")))
+    if current_python == windowless:
+        return False
 
     script_path = Path(root) / "start_app.py"
     os.execv(
@@ -126,6 +131,41 @@ def configure_startup_log():
     sys.stdout = stream
     sys.stderr = stream
     return stream
+
+
+APP_USER_MODEL_ID = "Prawin.JARVIS.Assistant"
+ICON_PATH = ROOT_DIR / "media" / "jarvis.ico"
+
+
+def set_windows_app_identity() -> None:
+    """Own taskbar entry and icon instead of being grouped under python.exe."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception:
+        pass
+
+
+def apply_window_icon(hwnd: int) -> bool:
+    """Set the JARVIS icon on a native window (title bar, taskbar, Alt+Tab)."""
+    if sys.platform != "win32" or not hwnd or not ICON_PATH.is_file():
+        return False
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    user32.LoadImageW.restype = ctypes.c_void_p
+    user32.SendMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p]
+    image_icon, load_from_file, wm_seticon = 1, 0x0010, 0x0080
+    small = user32.LoadImageW(None, str(ICON_PATH), image_icon, 16, 16, load_from_file)
+    big = user32.LoadImageW(None, str(ICON_PATH), image_icon, 48, 48, load_from_file)
+    if small:
+        user32.SendMessageW(hwnd, wm_seticon, 0, small)
+    if big:
+        user32.SendMessageW(hwnd, wm_seticon, 1, big)
+    return bool(small or big)
 
 
 def is_backend_running(url):
@@ -230,6 +270,19 @@ def start_app():
 
         window.events.closed += on_closed
 
+        def on_shown():
+            hwnd = 0
+            try:
+                hwnd = int(window.native.Handle.ToInt64())
+            except Exception:
+                import ctypes
+
+                hwnd = ctypes.windll.user32.FindWindowW(None, window.title) if sys.platform == "win32" else 0
+            apply_window_icon(hwnd)
+
+        if hasattr(window.events, "shown"):
+            window.events.shown += on_shown
+
         # 4. Start desktop app with persistent Edge Chromium storage.
         print("[SYSTEM] Opening user interface...")
         # Let the desktop window speak without a click so it can boot hands-free,
@@ -268,6 +321,7 @@ def start_app():
 
 if __name__ == "__main__":
     configure_startup_log()
+    set_windows_app_identity()
     if not acquire_single_instance():
         print("[SYSTEM] JARVIS is already running; not starting a second instance.")
         sys.exit(0)

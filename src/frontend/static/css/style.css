@@ -1345,9 +1345,10 @@ body::before {
     margin-top: 4px;
     width: min(92%, 760px);
     max-width: min(92%, 760px);
-    flex: 1 1 auto;
+    flex: 0 0 clamp(160px, 30vh, 320px);
+    height: clamp(160px, 30vh, 320px);
     min-height: 120px;
-    max-height: clamp(140px, 26vh, 240px);
+    max-height: none;
     padding: 8px 12px;
     text-align: left;
     display: flex;

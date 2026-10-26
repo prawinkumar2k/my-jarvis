@@ -3,6 +3,7 @@ TTS Routes: audio synthesis and pronunciation management.
 The engine instance is injected via init_tts_routes().
 """
 
+import asyncio
 import re
 import time as _time
 
@@ -118,9 +119,22 @@ async def generate_tts():
             text = text[:_tts_max_chars].rsplit(" ", 1)[0].strip()
 
         t0 = _time.time()
-        audio_bytes = _synthesize_audio(text)
+        audio_bytes = None
+        engine = "piper"
+        # Natural Gemini voice first; the local Piper voice is the offline fallback.
+        # Both run off the event loop so speaking never stalls other requests.
+        from engines import gemini_tts
+
+        if gemini_tts.enabled():
+            try:
+                audio_bytes = await asyncio.to_thread(gemini_tts.synthesize, text)
+                engine = "gemini"
+            except gemini_tts.GeminiTTSError as exc:
+                obs_event("gemini_tts_fallback", error=str(exc)[:40])
+        if audio_bytes is None:
+            audio_bytes = await asyncio.to_thread(_synthesize_audio, text)
         dur = _time.time() - t0
-        obs_event("tts_ok", duration_ms=int(dur * 1000), chars=len(text))
+        obs_event("tts_ok", duration_ms=int(dur * 1000), chars=len(text), engine=engine)
 
         resp = await make_response(audio_bytes)
         resp.headers["Content-Type"] = "audio/wav"

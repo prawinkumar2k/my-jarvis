@@ -161,3 +161,55 @@ def convert_to_ogg_opus(
         ],
         expected_magic=b"OggS",
     )
+
+
+def _pcm_wav_to_array(data: bytes):
+    import io
+    import wave
+
+    import numpy as np
+
+    with wave.open(io.BytesIO(data), "rb") as wav:
+        channels, width, rate = wav.getnchannels(), wav.getsampwidth(), wav.getframerate()
+        frames = wav.readframes(wav.getnframes())
+    scale = {1: None, 2: ("<i2", 32768.0), 4: ("<i4", 2147483648.0)}
+    if width not in scale:
+        raise wave.Error("unsupported sample width")
+    if width == 1:
+        samples = (np.frombuffer(frames, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+    else:
+        dtype, divisor = scale[width]
+        samples = np.frombuffer(frames, dtype=dtype).astype(np.float32) / divisor
+    if channels > 1:
+        samples = samples[: samples.size - samples.size % channels].reshape(-1, channels).mean(axis=1)
+    if rate != 16000 and samples.size:
+        target = round(samples.size * 16000 / rate)
+        samples = np.interp(np.linspace(0, samples.size - 1, target), np.arange(samples.size), samples)
+    return samples.astype(np.float32)
+
+
+def decode_for_whisper(
+    audio_bytes: bytes,
+    *,
+    runtime_dir: str | os.PathLike[str] | None = None,
+):
+    """Decode audio into the 16 kHz mono float32 array faster-whisper accepts.
+
+    Passing an array bypasses faster-whisper's PyAV decoder, which breaks on
+    some PyAV releases. PCM WAV is decoded with the standard library; any
+    other format (or WAV the standard library cannot read) goes through FFmpeg.
+    """
+    import wave
+
+    data = bytes(audio_bytes or b"")
+    if not data:
+        raise AudioConversionError(_CONVERSION_ERROR)
+    if data.startswith(b"RIFF"):
+        try:
+            return _pcm_wav_to_array(data)
+        except (wave.Error, EOFError, ValueError):
+            pass
+    try:
+        return _pcm_wav_to_array(convert_to_wav(data, runtime_dir=runtime_dir))
+    except (wave.Error, EOFError, ValueError):
+        raise AudioConversionError(_CONVERSION_ERROR) from None

@@ -146,8 +146,18 @@ def test_lazy_whisper_loads_once_for_concurrent_requests(tmp_path):
         model_loader=loader,
     )
 
+    import io
+    import wave
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wav:  # 0.1 s of real (silent) PCM audio
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16000)
+        wav.writeframes(bytes(3200))
+
     with ThreadPoolExecutor(max_workers=4) as pool:
-        texts = list(pool.map(lambda _: local.transcribe(b"RIFFaudio", "en"), range(4)))
+        texts = list(pool.map(lambda _: local.transcribe(buf.getvalue(), "en"), range(4)))
 
     assert texts == ["local text"] * 4
     assert loads == [("tiny", "cpu", "int8")]

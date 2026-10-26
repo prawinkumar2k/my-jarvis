@@ -12,13 +12,12 @@ from __future__ import annotations
 import io
 import os
 import re
-import tempfile
 import time as _time
 import unicodedata
 import wave
 
 from core.jarvis_config import RUNTIME_DIR, RUNTIME_PATHS
-from utils.audio_conversion import AudioConversionError, convert_to_wav
+from utils.audio_conversion import AudioConversionError, convert_to_wav, decode_for_whisper
 from utils.jarvis_i18n import get_current_language, get_whisper_lang
 from utils.jarvis_text import reparar_unicode
 
@@ -293,20 +292,11 @@ def transcribir_audio(
     if not whisper_model:
         return raw_hint
 
-    temp_path = None
     try:
-        with tempfile.NamedTemporaryFile(
-            prefix="temp_api_voice_",
-            suffix=".wav",
-            dir=RUNTIME_PATHS.temp,
-            delete=False,
-        ) as temp_file:
-            temp_file.write(audio_bytes)
-            temp_path = temp_file.name
-
+        audio = decode_for_whisper(audio_bytes, runtime_dir=RUNTIME_PATHS.temp)
         whisper_lang = get_active_whisper_language()
         segments_iter, _ = whisper_model.transcribe(
-            temp_path,
+            audio,
             language=whisper_lang,
             vad_filter=True,
             beam_size=WHISPER_BEAM_SIZE,
@@ -320,9 +310,6 @@ def transcribir_audio(
     except Exception as e:
         print(f"[VOICE ID] Whisper Error: {e}")
         return raw_hint
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
 
 
 # =========================================================

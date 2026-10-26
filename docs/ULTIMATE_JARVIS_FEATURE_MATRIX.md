@@ -24,6 +24,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 
 | Feature | Status | Notes |
 | --- | --- | --- |
+| Offline speech-to-text (faster-whisper `small`, CPU int8) | VERIFIED | Network blocked: 3/3 English sentences exact, 4–7 s each. Tamil not yet measured. FFmpeg not installed, so only WAV input works today |
 | Offline "Hey Jarvis" wake word | UNVERIFIED | Engine + real mic verified; your own voice not yet confirmed |
 | Gemini Live two-way voice, interruption | UNVERIFIED | Used by voice button and wake word; natural voice |
 | Spoken replies | VERIFIED | Gemini voice when quota allows, otherwise local `ryan-high` |
@@ -77,7 +78,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Emergency STOP (tools, live voice, playback, wake word) | VERIFIED | |
 | Tool risk levels, confirmation, path confinement, audit | VERIFIED | |
 | API key in Windows Credential Manager | MISSING | Key is in `.env` (git-ignored) |
-| Persistent multi-step tasks resumed after restart | MISSING | Exactly-once pipeline exists; no task checkpoints |
+| Persistent multi-step tasks resumed after restart | VERIFIED (unit) | SQLite checkpoints, bounded retries, approval gate, cancel, emergency stop; `/api/security/tasks`. No UI panel yet |
 
 ## Integrations
 

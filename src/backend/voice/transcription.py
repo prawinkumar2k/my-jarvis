@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from typing import Any, Protocol
 
 from core.jarvis_config import SpeechToTextConfig
 from core.runtime_logger import log_warning
+from utils.audio_conversion import AudioConversionError, decode_for_whisper
 
 from voice.pipeline import (
     WHISPER_BEAM_SIZE,
@@ -143,28 +143,19 @@ class LazyWhisperTranscriber:
             return ""
 
         self._runtime_dir.mkdir(parents=True, exist_ok=True)
-        temp_path: Path | None = None
         try:
-            with tempfile.NamedTemporaryFile(
-                prefix="jarvis_stt_",
-                suffix=".wav",
-                dir=self._runtime_dir,
-                delete=False,
-            ) as temp_file:
-                temp_file.write(audio_bytes)
-                temp_path = Path(temp_file.name)
-
-            segments, _ = model.transcribe(
-                str(temp_path),
-                language=language,
-                vad_filter=True,
-                beam_size=WHISPER_BEAM_SIZE,
-                condition_on_previous_text=False,
-            )
-            return normalizar_transcript_hint(reconstruir_transcripcion_por_pausas(list(segments)))
-        finally:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
+            audio = decode_for_whisper(audio_bytes, runtime_dir=self._runtime_dir)
+        except AudioConversionError:
+            log_warning("local_voice_transcription_decode_failed")
+            return ""
+        segments, _ = model.transcribe(
+            audio,
+            language=language,
+            vad_filter=True,
+            beam_size=WHISPER_BEAM_SIZE,
+            condition_on_previous_text=False,
+        )
+        return normalizar_transcript_hint(reconstruir_transcripcion_por_pausas(list(segments)))
 
     def snapshot(self) -> dict[str, bool | str]:
         with self._lock:

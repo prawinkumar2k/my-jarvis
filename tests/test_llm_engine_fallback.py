@@ -472,3 +472,39 @@ def test_init_brain_uses_gemini_api_key_saved_by_setup_screen(monkeypatch):
 
     assert brain_state.llm is not None
     assert brain_state.llm.model.startswith("gemini")
+
+
+class _RateLimitError(Exception):
+    pass
+
+
+class _Model:
+    def __init__(self, name, fail=False):
+        self.name, self.fail, self.calls = name, fail, 0
+
+    def invoke(self, _messages):
+        self.calls += 1
+        if self.fail:
+            raise _RateLimitError("429")
+        return type("Resp", (), {"content": f"answer from {self.name}"})()
+
+
+def test_conversation_falls_back_to_groq_once_on_gemini_rate_limit(monkeypatch):
+    from core.brain import brain_state, processor
+
+    gemini, groq = _Model("gemini", fail=True), _Model("groq")
+    monkeypatch.setattr(brain_state, "llm_fallback", groq)
+    response = processor._invoke_with_fallback(gemini, [], event="llm_direct_invoke_failed")
+    assert response.content == "answer from groq"
+    assert (gemini.calls, groq.calls) == (1, 1)
+
+
+def test_conversation_fallback_is_bounded_when_both_fail(monkeypatch):
+    from core.brain import brain_state, processor
+    from core.errors import LLMServiceError
+
+    gemini, groq = _Model("gemini", fail=True), _Model("groq", fail=True)
+    monkeypatch.setattr(brain_state, "llm_fallback", groq)
+    with pytest.raises(LLMServiceError):
+        processor._invoke_with_fallback(gemini, [], event="llm_direct_invoke_failed")
+    assert (gemini.calls, groq.calls) == (1, 1)  # no retry loop

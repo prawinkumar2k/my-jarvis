@@ -174,7 +174,7 @@ The defaults in `.env.example` currently use:
 | `JARVIS_GEMINI_LIVE_VOICE` | Gemini Live voice | `Charon` |
 | `JARVIS_GEMINI_MODEL` | Standard Gemini text/reasoning model | `gemini-2.5-flash` |
 | `JARVIS_GEMINI_VISION_MODEL` | Gemini vision model | `gemini-2.5-flash` |
-| `JARVIS_GROQ_MODEL` | Alternate/fallback Groq model | `qwen/qwen3.6-27b` |
+| `JARVIS_GROQ_MODEL` | Alternate/fallback Groq model | `openai/gpt-oss-120b` |
 | `JARVIS_STT_PROVIDER` | Speech-to-text provider selection | `auto` |
 | `JARVIS_GROQ_STT_MODEL` | Groq STT model | `whisper-large-v3-turbo` |
 | `JARVIS_LOCAL_STT_ENABLED` | Enable local Faster-Whisper fallback | `true` |

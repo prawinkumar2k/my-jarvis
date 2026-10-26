@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-_DEFAULT_GROQ_MODEL = "qwen/qwen3.6-27b"
+_DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"  # production on Groq; qwen3.6-27b was retired
 
 
 @dataclass(frozen=True)

@@ -74,7 +74,7 @@ def test_provider_defaults_use_current_stable_models():
     )
 
     assert config.primary_model == "gemini-2.5-flash"
-    assert config.fallback_model == "qwen/qwen3.6-27b"
+    assert config.fallback_model == "openai/gpt-oss-120b"
 
 
 def test_provider_rejects_a_gemini_model_in_groq_configuration():
@@ -88,4 +88,4 @@ def test_provider_rejects_a_gemini_model_in_groq_configuration():
 
     assert config.primary_provider == "gemini"
     assert config.fallback_provider == "groq"
-    assert config.fallback_model == "qwen/qwen3.6-27b"
+    assert config.fallback_model == "openai/gpt-oss-120b"

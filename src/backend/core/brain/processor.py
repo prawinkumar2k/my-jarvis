@@ -95,6 +95,37 @@ def _invoke_model(model, messages: list, *, event: str):
         raise LLMServiceError from None
 
 
+# Everyday tools offered to the fallback provider (keeps each request small).
+FALLBACK_TOOL_NAMES = frozenset(
+    {
+        "abrir_aplicacion", "abrir_navegador", "ajustar_volumen", "control_multimedia", "ajustar_brillo",
+        "captura_pantalla", "organizar_ventanas", "listar_ventanas", "controlar_ventana", "enfocar_ventana",
+        "informacion_sistema", "estado_jarvis", "resumen_del_dia", "obtener_clima", "buscar_en_internet",
+        "poner_temporizador", "poner_alarma", "poner_recordatorio", "listar_recordatorios",
+        "cancelar_recordatorio", "guardar_nota", "leer_notas", "borrar_nota", "listar_carpeta",
+        "buscar_archivos", "cambiar_idioma", "reproducir_en_youtube", "ver_memorias", "guardar_dato_memoria",
+    }
+)
+
+
+def _invoke_with_fallback(model, messages: list, *, event: str):
+    """Primary model once, then the fallback provider once (e.g. Groq after a Gemini 429).
+
+    Bounded: at most two calls, each with the client's short timeout and no
+    automatic retries, so a quota error never loops.
+    """
+    try:
+        return model.invoke(messages)
+    except Exception as exc:
+        obs_event(event, error=type(exc).__name__)
+        fallback = brain_state.llm_fallback
+        if fallback is None or fallback is model:
+            raise LLMServiceError from None
+    response = _invoke_model(fallback, messages, event="llm_fallback_invoke_failed")
+    obs_event("llm_fallback_succeeded", stage=event)
+    return response
+
+
 def _reply_needs_strict_web_retry(
     user_input: str,
     reply: str,
@@ -493,7 +524,7 @@ def _ejecutar_cerebro_llm(user_input: str, pid: str) -> tuple[str, bool]:
         raise LLMUnavailableError
 
     if not necesita_tools(user_input):
-        response = _invoke_model(
+        response = _invoke_with_fallback(
             brain_state.llm,
             messages,
             event="llm_direct_invoke_failed",
@@ -507,7 +538,7 @@ def _ejecutar_cerebro_llm(user_input: str, pid: str) -> tuple[str, bool]:
         )
 
     if brain_state.llm_with_tools is None:
-        response = _invoke_model(
+        response = _invoke_with_fallback(
             brain_state.llm,
             messages,
             event="llm_plain_fallback_failed",
@@ -765,11 +796,16 @@ class _RuntimeGroqPlanner:
         fallback_allowed_tools: tuple[str, ...] = ()
         try:
             if registry.tools and hasattr(fallback_model, "bind_tools"):
+                # Free-tier fallback providers (Groq: 8k tokens/minute) cannot take
+                # all ~100 tool schemas per request; send the everyday subset.
+                fallback_tools = [
+                    tool for tool in registry.tools if getattr(tool, "name", "") in FALLBACK_TOOL_NAMES
+                ] or list(registry.tools)
                 fallback_model = fallback_model.bind_tools(
-                    list(registry.tools),
+                    fallback_tools,
                     tool_choice="auto",
                 )
-                fallback_allowed_tools = tuple(registry.by_name)
+                fallback_allowed_tools = tuple(getattr(tool, "name", "") for tool in fallback_tools)
             plan = GroqPlanner(
                 fallback_model,
                 allowed_tools=fallback_allowed_tools,

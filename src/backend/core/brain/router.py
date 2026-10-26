@@ -893,6 +893,15 @@ def plan_hybrid(
             level = f"{volume_value:+g}"
         return _tool_plan(request, "ajustar_volumen", {"nivel": level})
 
+    # Everyday English/Thanglish commands that need no AI call (works offline
+    # and when every AI provider is rate-limited).
+    from core.brain.local_intents import match_local_intent
+
+    local_intent = match_local_intent(user_input)
+    if local_intent is not None:
+        tool_name, tool_args = local_intent
+        return _tool_plan(request, tool_name, tool_args)
+
     weather_markers = [
         "clima",
         "temperatura",

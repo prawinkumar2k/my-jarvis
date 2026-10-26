@@ -18,10 +18,13 @@ class LLMProviderConfig:
     fallback_provider: str = ""
     fallback_model: str = ""
     fallback_api_key: str = field(default="", repr=False)
+    # Extra providers tried after the fallback (e.g. local Ollama in cloud_first mode).
+    extra_fallbacks: tuple[tuple[str, str, str], ...] = field(default=(), repr=False)
+    mode: str = "cloud_first"
 
     @property
     def configured(self) -> bool:
-        return bool(self.primary_provider and self.primary_api_key)
+        return bool(self.primary_provider and (self.primary_api_key or self.primary_provider == "ollama"))
 
 
 def _provider_model(
@@ -50,8 +53,13 @@ def resolve_llm_provider_config(
     requested = str(source.get("JARVIS_LLM_PROVIDER") or "").strip().lower()
     if requested == "google":
         requested = "gemini"
-    if requested not in {"", "gemini", "groq"}:
+    if requested not in {"", "gemini", "groq", "ollama"}:
         requested = ""
+    mode = str(source.get("JARVIS_AI_MODE") or "cloud_first").strip().lower()
+    if mode not in {"cloud_first", "local_first", "local_only"}:
+        mode = "cloud_first"
+    local_model = str(source.get("OLLAMA_MODEL") or "").strip()
+    local = ("ollama", local_model, "ollama") if local_model else ("", "", "")
 
     gemini_key = str(source.get("GEMINI_API_KEY") or source.get("GOOGLE_API_KEY") or "").strip()
     groq_key = str(source.get("GROQ_API_KEY") or "").strip()
@@ -84,6 +92,23 @@ def resolve_llm_provider_config(
         primary = ("", "", "")
         fallback = ("", "", "")
 
+    extras: tuple[tuple[str, str, str], ...] = ()
+    if local[0]:
+        cloud = [entry for entry in (primary, fallback) if entry[0]]
+        if mode == "local_only" or requested == "ollama" and not cloud:
+            primary, fallback, extras = local, ("", "", ""), ()
+        elif mode == "local_first" or requested == "ollama":
+            chain = [local, *cloud]
+            primary, fallback, extras = chain[0], chain[1] if len(chain) > 1 else ("", "", ""), tuple(chain[2:])
+        elif primary[0]:
+            if fallback[0]:
+                extras = (local,)
+            else:
+                fallback = local
+        else:  # no cloud keys at all: local model keeps JARVIS working
+            primary = local
+    elif mode == "local_only":
+        primary, fallback = ("", "", ""), ("", "", "")
     return LLMProviderConfig(
         primary_provider=primary[0],
         primary_model=primary[1],
@@ -91,6 +116,8 @@ def resolve_llm_provider_config(
         fallback_provider=fallback[0],
         fallback_model=fallback[1],
         fallback_api_key=fallback[2],
+        extra_fallbacks=extras,
+        mode=mode,
     )
 
 
@@ -111,4 +138,7 @@ def provider_base_url(provider: str) -> str:
         return "https://generativelanguage.googleapis.com/v1beta/openai/"
     if provider == "groq":
         return "https://api.groq.com/openai/v1"
+    if provider == "ollama":
+        base = str(os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").rstrip("/")
+        return f"{base}/v1"
     raise ValueError("unsupported_llm_provider")

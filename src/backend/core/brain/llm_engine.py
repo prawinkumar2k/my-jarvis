@@ -324,6 +324,36 @@ class LLMRuntimeCandidate:
     fallback_provider: str = ""
 
 
+class ChainedFallbackChat:
+    """Try several chat clients in order, each once (e.g. Groq, then local Ollama).
+
+    Bounded: one call per provider with that client's own timeout and no
+    automatic retries, so a quota error never turns into a retry loop.
+    """
+
+    def __init__(self, clients):
+        self.clients = [c for c in clients if c is not None]
+        first = self.clients[0] if self.clients else None
+        self.model = getattr(first, "model", "") if first is not None else ""
+        self.model_name = getattr(first, "model_name", self.model) if first is not None else ""
+
+    def invoke(self, messages, *args, **kwargs):
+        last_error: Exception | None = None
+        for client in self.clients:
+            try:
+                return client.invoke(messages, *args, **kwargs)
+            except Exception as exc:  # next provider
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("no_fallback_clients")
+
+    def bind_tools(self, tools, **kwargs):
+        return ChainedFallbackChat(
+            [c.bind_tools(tools, **kwargs) if hasattr(c, "bind_tools") else c for c in self.clients]
+        )
+
+
 def _build_llm_clients(provider_env: Mapping[str, str]):
     provider_config = resolve_llm_provider_config(provider_env)
     if not provider_config.configured:
@@ -332,12 +362,18 @@ def _build_llm_clients(provider_env: Mapping[str, str]):
     chat_open_ai = _load_chat_openai()
 
     def create_client(model: str, api_key: str, provider: str):
+        timeout = 10
+        if provider == "ollama":  # local CPU inference is slower than cloud APIs
+            try:
+                timeout = max(5, min(300, int(float(provider_env.get("OLLAMA_TIMEOUT_SECONDS") or 60))))
+            except ValueError:
+                timeout = 60
         return chat_open_ai(
             model=model,
             temperature=0,
             api_key=api_key,
             base_url=provider_base_url(provider),
-            timeout=10,
+            timeout=timeout,
             max_retries=0,
         )
 
@@ -366,6 +402,9 @@ def _build_llm_clients(provider_env: Mapping[str, str]):
             provider_config.fallback_api_key,
             provider_config.fallback_provider,
         )
+        extras = [create_client(model, key, name) for name, model, key in provider_config.extra_fallbacks]
+        if extras:
+            fallback = ChainedFallbackChat([fallback, *extras])
 
     return (
         primary,

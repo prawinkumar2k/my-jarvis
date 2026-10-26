@@ -174,7 +174,9 @@ def _runtime_capabilities(
 
     llm_config = resolve_llm_provider_config()
     if jarvis_brain.llm is not None:
-        detail = f"Fallback provider: {llm_config.fallback_provider}" if llm_config.fallback_provider else ""
+        chain = [llm_config.fallback_provider, *(entry[0] for entry in llm_config.extra_fallbacks)]
+        chain = [name for name in chain if name]
+        detail = f"Fallback provider: {' -> '.join(chain)}" if chain else ""
         publish(
             "llm",
             CapabilityState.AVAILABLE,

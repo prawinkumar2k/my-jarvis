@@ -14,7 +14,10 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Gemini chat with tools (function calling), Thanglish replies | VERIFIED | Live: "system condition enna" → tool run → Thanglish answer |
 | Clear rate-limit / bad-key / network errors | VERIFIED | `llm_rate_limited`, `llm_auth_failed`, `llm_timeout`, `llm_network` (tested) |
 | Connection test (model, latency, problem) | VERIFIED (unit) | `POST /api/security/ai-test`; "nee ok-a?" uses it |
-| Backup AI when Gemini is rate-limited | BLOCKED | Needs a free `GROQ_API_KEY`; fallback code already exists |
+| Backup AI when Gemini is rate-limited | VERIFIED | Groq `openai/gpt-oss-120b`; real fallback observed (`llm_fallback_succeeded`) |
+| Local AI (Ollama `qwen2.5:3b`, Q4_K_M, 1.93 GB) | VERIFIED | Real inference: cold load 150 s once, then 0.2–3.5 s; 100% on the T500 GPU; tool calling works; Thanglish quality poor |
+| AI mode `cloud_first` / `local_first` / `local_only` | VERIFIED (unit) | Default cloud_first: Gemini → Groq → Ollama |
+| Offline everyday commands (no AI call) | VERIFIED (unit) | apps, media, brightness, screenshot, timers, alarms, notes, summary, self check, layouts |
 | Streaming text while typing | PARTIAL | Tool replies arrive whole; plain chat streams |
 
 ## Voice

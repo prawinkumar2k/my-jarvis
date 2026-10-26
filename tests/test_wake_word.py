@@ -124,3 +124,28 @@ def test_real_engine_detects_spoken_hey_jarvis_offline(monkeypatch):
 
     assert len(detections("Hey Jarvis!")) == 1
     assert detections("Open notepad please.") == []
+
+
+def test_wake_word_preference_is_remembered(monkeypatch, tmp_path):
+    monkeypatch.setattr(wake_word, "_pref_path", lambda: tmp_path / "wake_word.json")
+    assert wake_word.remembered_enabled() is False
+    wake_word.remember_enabled(True)
+    assert wake_word.remembered_enabled() is True
+    wake_word.remember_enabled(False)
+    assert wake_word.remembered_enabled() is False
+
+
+def test_unmute_is_not_treated_as_mute(monkeypatch):
+    from tools import system
+
+    calls = []
+
+    class FakeMute:
+        def invoke(self, args):
+            calls.append(args["activar"])
+            return "ok"
+
+    monkeypatch.setattr(system, "modo_no_molestar", FakeMute())
+    system.ajustar_volumen.invoke({"nivel": "unmute"})
+    system.ajustar_volumen.invoke({"nivel": "mute"})
+    assert calls == [False, True]

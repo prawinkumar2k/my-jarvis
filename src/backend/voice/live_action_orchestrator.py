@@ -305,7 +305,7 @@ class LiveActionOrchestrator:
         emit_json: Callable[[dict[str, Any]], Any] | None = None,
         diagnostics: LiveDiagnosticsCollector | None = None,
         invoke_tool: Callable[[str, dict[str, Any], str, str, str], Any] | None = None,
-        action_timeout_seconds: float = 15.0,
+        action_timeout_seconds: float = 10.0,
     ) -> None:
         self.session_id = session_id
         self.profile_id = profile_id

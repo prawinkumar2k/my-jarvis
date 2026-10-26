@@ -163,10 +163,14 @@ def _ajustar_volumen_relativo(delta: float) -> str:
 
 @tool
 def ajustar_volumen(nivel: int | float | str) -> str:
-    """Ajusta el volumen maestro del sistema (0-100), o sube/baja relativamente ('subir', 'bajar', '+10', '-10', '50%', 'bajalo al 50', 'subelo al 100')."""
+    """Set the Windows system volume or mute it. Use for ANY volume or mute request, e.g. 'mute', 'unmute',
+    'volume 50', 'volume up/down', '+10', 'sound kammi pannu', 'mute pannu' (also: 'subir', 'bajar', 'silenciar')."""
     try:
         raw = str(nivel).strip().lower()
 
+        # Check unmute first: "unmute" contains "mute".
+        if any(w in raw for w in ("unmute", "desmutear", "desilenciar", "activar sonido", "sound on")):
+            return modo_no_molestar.invoke({"activar": False})
         if any(w in raw for w in ("mute", "mutear", "silenciar", "silencio", "callate", "cállate")):
             return modo_no_molestar.invoke({"activar": True})
 

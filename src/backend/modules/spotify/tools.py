@@ -19,7 +19,8 @@ def reproducir_mix_spotify(semilla: str) -> str:
 
 @tool
 def controlar_reproduccion(accion: str) -> str:
-    """Control Spotify through a cached API session or Spotify Desktop."""
+    """Control Spotify playback only (play, pause, next, previous) when the user mentions Spotify or music.
+    NEVER use this for system volume or mute: use ajustar_volumen for volume, mute and unmute."""
     return service.control(accion)
 
 

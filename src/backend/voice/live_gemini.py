@@ -117,7 +117,9 @@ class GeminiLiveStreamer:
                 f"{self.system_instruction} "
                 "Use only the supplied active-profile context. "
                 "Never claim that a tool succeeded unless its tool response says so. "
-                "Keep spoken replies concise and do not expose hidden reasoning."
+                "Keep spoken replies concise and do not expose hidden reasoning. "
+                "Speak at a calm, moderate pace with clear pauses between sentences; "
+                "pronounce Tamil and Thanglish words clearly; prefer short sentences."
             )
             return build_live_context(
                 base_instruction=base_instruction,

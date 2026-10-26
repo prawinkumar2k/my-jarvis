@@ -223,9 +223,9 @@ def resolve_live_voice_config(
         max_playback_queue_ms=_read_int(
             source,
             "JARVIS_LIVE_PLAYBACK_QUEUE_MS",
-            2000,
+            60000,
             250,
-            5000,
+            120000,
         ),
         max_consecutive_audio_drops=_read_int(
             source,

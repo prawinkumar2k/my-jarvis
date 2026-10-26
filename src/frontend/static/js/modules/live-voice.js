@@ -47,9 +47,12 @@ export function liveVoiceErrorView(error, translate) {
 }
 
 export class AudioBufferQueuePlayer {
-    constructor(sampleRate = 24000, maxQueuedMs = 2000) {
+    // Gemini Live streams a reply faster than real time. A small cap made the
+    // player flush queued speech mid-sentence (skipped words, rushed audio);
+    // barge-in interrupts separately, so the cap only guards runaway buffers.
+    constructor(sampleRate = 24000, maxQueuedMs = 60000) {
         this.sampleRate = sampleRate;
-        this.maxQueuedMs = Math.max(250, Number(maxQueuedMs) || 2000);
+        this.maxQueuedMs = Math.max(250, Number(maxQueuedMs) || 60000);
         this.audioCtx = null;
         this.nextPlayTime = 0;
         this.activeSources = [];
@@ -213,7 +216,7 @@ export class LiveVoiceClient {
         this.ws = null;
         this.player = options.player || new AudioBufferQueuePlayer(
             24000,
-            options.maxPlaybackQueueMs ?? 2000
+            options.maxPlaybackQueueMs ?? 60000
         );
         this.bargeInDetector = new BargeInDetector();
         this.capture = options.capture || new LivePcmCapture({

@@ -170,11 +170,23 @@ async def reminders_status():
     return jsonify({"pending": reminder_store.pending(), "due": due})
 
 
+@security_bp.before_app_serving
+async def _restore_wake_word():
+    """Turn "Hey Jarvis" back on at startup if the user left it on."""
+    try:
+        from voice.wake_word import remembered_enabled, wake_word_listener
+
+        if remembered_enabled():
+            await asyncio.to_thread(wake_word_listener.start)
+    except Exception as exc:
+        print(f"[WARN wake_word] restore failed: {type(exc).__name__}")
+
+
 @security_bp.route("/api/security/wakeword", methods=["GET", "POST"])
 async def wakeword():
     """Offline "Hey Jarvis" listener. GET ?since=<event_id> returns new detections."""
 
-    from voice.wake_word import wake_word_listener
+    from voice.wake_word import remember_enabled, wake_word_listener
 
     if request.method == "POST":
         data = (await request.get_json(silent=True)) or {}
@@ -189,8 +201,10 @@ async def wakeword():
             ok, message = await asyncio.to_thread(wake_word_listener.start)
             if not ok:
                 return jsonify({**wake_word_listener.status(), "error": message}), 503
+            remember_enabled(True)
         else:
             await asyncio.to_thread(wake_word_listener.stop)
+            remember_enabled(False)
     try:
         since = int(request.args.get("since", "0"))
     except ValueError:

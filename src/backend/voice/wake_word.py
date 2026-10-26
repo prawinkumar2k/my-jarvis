@@ -155,4 +155,31 @@ class WakeWordListener:
         }
 
 
+def _pref_path():
+    from core.runtime_paths import resolve_runtime_paths
+
+    return resolve_runtime_paths().memory / "wake_word.json"
+
+
+def remembered_enabled() -> bool:
+    """Whether the user left the wake word ON last time (restored at startup)."""
+    import json
+
+    try:
+        return bool(json.loads(_pref_path().read_text(encoding="utf-8")).get("enabled"))
+    except (OSError, ValueError):
+        return False
+
+
+def remember_enabled(enabled: bool) -> None:
+    import json
+
+    try:
+        path = _pref_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"enabled": bool(enabled)}), encoding="utf-8")
+    except OSError as exc:
+        log_warning("wake_word_pref_save_failed", error=type(exc).__name__)
+
+
 wake_word_listener = WakeWordListener()

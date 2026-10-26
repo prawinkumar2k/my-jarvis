@@ -232,6 +232,11 @@ def start_app():
 
         # 4. Start desktop app with persistent Edge Chromium storage.
         print("[SYSTEM] Opening user interface...")
+        # Let the desktop window speak without a click so it can boot hands-free.
+        os.environ.setdefault(
+            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            "--autoplay-policy=no-user-gesture-required",
+        )
         gui_engine = 'edgechromium' if sys.platform == 'win32' else None
 
         try:

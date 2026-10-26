@@ -376,6 +376,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let bootStarted = false;
+    // The desktop app (WebView2, autoplay allowed by start_app.py) boots by itself.
+    if (dom.loader && navigator.userAgent.includes('DesktopJarvis')) {
+        setTimeout(() => { if (!bootStarted) dom.loader.click(); }, 600);
+    }
     dom.loader?.addEventListener('click', () => {
         if (bootStarted) return;
         bootStarted = true;

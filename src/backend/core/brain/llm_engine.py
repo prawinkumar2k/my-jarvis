@@ -481,8 +481,15 @@ def init_brain(app_ref):
         .replace('"', "")
         .replace("'", "")
     )
+    # The setup screen saves GEMINI_API_KEY; GOOGLE_API_KEY is the legacy name.
+    # Reading only the legacy one dropped the saved key on every restart.
     google_key = (
-        (getattr(sys.modules[__name__], "GOOGLE_API_KEY", None) or GOOGLE_API_KEY or "")
+        (
+            getattr(sys.modules[__name__], "GOOGLE_API_KEY", None)
+            or GOOGLE_API_KEY
+            or os.getenv("GEMINI_API_KEY")
+            or ""
+        )
         .strip()
         .replace('"', "")
         .replace("'", "")

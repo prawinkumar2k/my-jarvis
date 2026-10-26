@@ -26,6 +26,10 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 os.environ.setdefault("GROQ_API_KEY", "test-key-smoke")
+# Keep a developer's real Gemini key (loaded from .env by load_dotenv, which
+# never overrides existing variables) out of the test run.
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GOOGLE_API_KEY"] = ""
 os.environ["JARVIS_TEST_MODE"] = "1"
 os.environ["JARVIS_AUTOCURACION"] = "false"
 # Tests must never inherit the developer's real API credential from the shell

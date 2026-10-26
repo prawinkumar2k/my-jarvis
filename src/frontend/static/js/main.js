@@ -1133,6 +1133,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 logBrowserRecognitionFallback('unsupported');
             }
             const inactiveMode = ['passive', 'idle', 'transition'].includes(currentMode);
+            if (isLiveVoiceActive) {
+                stopLiveVoiceStream();
+                return;
+            }
+            if (inactiveMode && liveVoicePreferred) {
+                startLiveVoiceStream();
+                return;
+            }
             if (inactiveMode) {
                 setCurrentMode('transition', 'activate_btn_handoff');
                 clearPassiveRestartTimer();
@@ -1739,11 +1747,30 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // Gemini Live (cloud, real-time, understands Tamil/Thanglish) is preferred
+    // over local Whisper, which needs a large model download and is slow on CPU.
+    let liveVoicePreferred = false;
+    fetch('/api/status', { cache: 'no-store' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+            liveVoicePreferred = String(data?.capabilities?.live_voice?.state || '').toLowerCase() === 'available';
+        })
+        .catch(() => { liveVoicePreferred = false; });
+
     function activateFromWakeWord() {
         if (Date.now() < wakeWordCooldownUntil) {
             return;
         }
         if (currentMode === 'active' || currentMode === 'processing') {
+            return;
+        }
+        if (liveVoicePreferred) {
+            if (!isLiveVoiceActive) {
+                wakeWordCooldownUntil = Date.now() + 700;
+                if (isSpeaking) interrumpirAudio();
+                ui.addLogEntry('> Wake word: Gemini Live');
+                startLiveVoiceStream();
+            }
             return;
         }
         wakeWordCooldownUntil = Date.now() + 700;
@@ -2563,7 +2590,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('wakeword-toggle')?.addEventListener('click', toggleWakeword);
-    renderWakeword();
+    // Sync with the backend: the listener may already be on (enabled earlier or by script).
+    fetch('/api/security/wakeword', { cache: 'no-store' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+            wakewordEnabled = data?.listening === true;
+            const last = (data?.events || []).slice(-1)[0];
+            if (last) wakewordLastEvent = last.event_id;
+            if (wakewordEnabled && !wakewordTimer) wakewordTimer = setInterval(pollWakeword, 700);
+            renderWakeword();
+        })
+        .catch(() => renderWakeword());
 
     // Persistent reminders: the backend fires due ones; each is returned once.
     async function checkReminders() {

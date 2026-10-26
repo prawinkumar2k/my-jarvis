@@ -438,3 +438,37 @@ def test_reconfigure_llm_runtime_rolls_back_when_tool_rebind_fails(monkeypatch):
     assert brain_state.llm is previous
     assert services.llm is previous
     assert brain_state.llm_primary_provider == "previous"
+
+
+def test_init_brain_uses_gemini_api_key_saved_by_setup_screen(monkeypatch):
+    """Regression: setup saves GEMINI_API_KEY; startup must not drop it after a restart."""
+    from core.brain import brain_state
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            self.model = kwargs["model"]
+            self.api_key = kwargs.get("api_key")
+
+        def bind_tools(self, tools, tool_choice="auto", **_kwargs):
+            return self
+
+    monkeypatch.setattr(llm_engine, "_load_chat_openai", lambda: FakeChatOpenAI)
+    monkeypatch.setattr(llm_engine, "GOOGLE_API_KEY", "", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-from-setup")
+    monkeypatch.delenv("JARVIS_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(llm_engine, "GROQ_API_KEY", "")
+    monkeypatch.setattr(llm_engine, "VISION_ENABLED", False, raising=False)
+    monkeypatch.setattr(llm_engine, "PLUGINS_ENABLED", False, raising=False)
+    monkeypatch.setattr(llm_engine, "BRIEFING_ENABLED", False, raising=False)
+    monkeypatch.setattr(llm_engine.core_tools, "inject_dependencies", lambda _deps: None)
+    monkeypatch.setattr(llm_engine.core_tools, "get_base_tools", lambda: [])
+    monkeypatch.setattr(brain_state, "llm", None)
+    monkeypatch.setattr(brain_state, "llm_vision", None)
+    monkeypatch.setattr(brain_state, "llm_fallback", None)
+    monkeypatch.setattr(brain_state, "llm_with_tools", None)
+
+    llm_engine.init_brain(app_ref=None)
+
+    assert brain_state.llm is not None
+    assert brain_state.llm.model.startswith("gemini")

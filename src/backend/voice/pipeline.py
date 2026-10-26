@@ -99,10 +99,13 @@ except Exception:
     HINT_MIN_CONFIDENCE = 0.58
 
 
-def get_active_whisper_language() -> str:
-    """Return the Whisper language code for the current runtime language."""
+def get_active_whisper_language() -> str | None:
+    """Return the Whisper language code for the current runtime language
+    (JARVIS_STT_LANGUAGE can force one, or 'auto' to let Whisper detect it)."""
+    from voice.transcription import stt_language
+
     try:
-        return get_whisper_lang(get_current_language())
+        return stt_language(get_whisper_lang(get_current_language()))
     except Exception:
         return "en"
 

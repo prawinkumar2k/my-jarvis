@@ -191,6 +191,12 @@ def tool_status() -> dict:
     from utils.audio_conversion import ffmpeg_executable
 
     status: dict = {"ffmpeg": bool(ffmpeg_executable())}
+    try:
+        from tools.browser import browser_automation_status
+
+        status["browser_automation"] = browser_automation_status()
+    except Exception:
+        status["browser_automation"] = None
     winget = shutil.which("winget")
     status["winget"] = (_run([winget, "--version"], 10) or "").strip() or None if winget else None
     base = (os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").rstrip("/")
@@ -251,4 +257,8 @@ def summarize(report: dict) -> str:
     tools = report.get("tools") or {}
     lines.append(f"Tools: winget {tools.get('winget') or 'missing'}, FFmpeg {'ok' if tools.get('ffmpeg') else 'missing'}, "
                  f"Ollama {tools.get('ollama') or 'not running'}")
+    web = tools.get("browser_automation") or {}
+    if web:
+        engine = "Playwright Chromium" if web.get("bundled_chromium") else ", ".join(web.get("installed_browsers") or []) or "none"
+        lines.append(f"Browser automation: {'ready' if web.get('ready') else 'not available'} ({engine})")
     return "\n".join(lines)

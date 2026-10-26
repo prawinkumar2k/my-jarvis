@@ -267,3 +267,15 @@ def instalar_programa(id_paquete: str) -> str:
 def cancelar_instalacion() -> str:
     """Stop the winget install that is running, if any."""
     return cancel_install()
+
+
+def _register_emergency_stop() -> None:
+    try:
+        from core.security import emergency_stop
+
+        emergency_stop.register_cancel_hook("winget_install", cancel_install)
+    except Exception:  # never break tool loading over the hook
+        pass
+
+
+_register_emergency_stop()

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 
 class StubTranscriber:
     def __init__(self, text: str = "", error: Exception | None = None):
@@ -198,3 +200,45 @@ def test_transcription_snapshot_contains_no_api_key():
     assert snapshot["provider"] == "auto"
     assert snapshot["groq_configured"] is True
     assert "gsk_secret_value" not in repr(snapshot)
+
+
+@pytest.mark.parametrize(
+    ("setting", "ui", "expected"),
+    [("", "ta", "ta"), ("", "en", "en"), ("auto", "ta", None), ("en", "ta", "en"), ("ta", "en", "ta"), ("../x", "en", "en")],
+)
+def test_stt_language_setting(monkeypatch, setting, ui, expected):
+    from voice.transcription import stt_language
+
+    monkeypatch.setenv("JARVIS_STT_LANGUAGE", setting)
+    assert stt_language(ui) == expected
+
+
+def test_local_transcriber_reports_detected_language_not_words(tmp_path, monkeypatch):
+    import io
+    import wave
+    from types import SimpleNamespace
+
+    from voice.transcription import LazyWhisperTranscriber
+
+    monkeypatch.setenv("JARVIS_STT_LANGUAGE", "auto")
+    seen = {}
+
+    class FakeModel:
+        def transcribe(self, _audio, **kwargs):
+            seen.update(kwargs)
+            info = SimpleNamespace(language="ta", language_probability=0.871, duration=1.24)
+            return [SimpleNamespace(text=" secret words ", start=0.0, end=1.0)], info
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16000)
+        wav.writeframes(bytes(3200))
+    stt = LazyWhisperTranscriber(enabled=True, model_name="small", device="cpu", compute_type="int8",
+                                 runtime_dir=tmp_path, model_loader=lambda *a: FakeModel())
+    assert stt.transcribe(buf.getvalue(), "en") == "secret words"
+    assert seen["language"] is None  # auto: Whisper detects the language
+    snap = stt.snapshot()
+    assert snap["last"] == {"language": "ta", "probability": 0.87, "seconds_of_audio": 1.2, "where": "local (this PC)"}
+    assert "secret" not in str(snap)

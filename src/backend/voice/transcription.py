@@ -86,6 +86,23 @@ class GroqAudioTranscriber:
         return normalizar_transcript_hint(getattr(response, "text", ""))
 
 
+def stt_language_setting() -> str:
+    """JARVIS_STT_LANGUAGE: "" (follow the UI language), "auto" (Whisper detects), or a code like en / ta."""
+    import os
+
+    return str(os.getenv("JARVIS_STT_LANGUAGE") or "").strip().lower()
+
+
+def stt_language(ui_language: str | None) -> str | None:
+    """Language passed to Whisper. None lets Whisper detect it (useful for mixed Tamil/English)."""
+    setting = stt_language_setting()
+    if setting == "auto":
+        return None
+    if setting and setting.isalpha() and 2 <= len(setting) <= 3:
+        return setting
+    return ui_language or None
+
+
 class LazyWhisperTranscriber:
     def __init__(
         self,
@@ -148,18 +165,27 @@ class LazyWhisperTranscriber:
         except AudioConversionError:
             log_warning("local_voice_transcription_decode_failed")
             return ""
-        segments, _ = model.transcribe(
+        segments, info = model.transcribe(
             audio,
-            language=language,
+            language=stt_language(language),
             vad_filter=True,
             beam_size=WHISPER_BEAM_SIZE,
             condition_on_previous_text=False,
         )
-        return normalizar_transcript_hint(reconstruir_transcripcion_por_pausas(list(segments)))
+        text = normalizar_transcript_hint(reconstruir_transcripcion_por_pausas(list(segments)))
+        # Diagnostics only: which language Whisper used, never the words.
+        self._last = {
+            "language": str(getattr(info, "language", "") or ""),
+            "probability": round(float(getattr(info, "language_probability", 0.0) or 0.0), 2),
+            "seconds_of_audio": round(float(getattr(info, "duration", 0.0) or 0.0), 1),
+            "where": "local (this PC)",
+        }
+        return text
 
-    def snapshot(self) -> dict[str, bool | str]:
+    def snapshot(self) -> dict:
         with self._lock:
-            return {"enabled": self._enabled, "state": self._state}
+            return {"enabled": self._enabled, "state": self._state, "model": self._model_name,
+                    "language_setting": stt_language_setting(), "last": dict(getattr(self, "_last", {}) or {})}
 
 
 class TranscriptionCoordinator:

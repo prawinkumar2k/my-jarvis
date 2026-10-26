@@ -62,6 +62,52 @@ def _playwright_hint() -> str:
     )
 
 
+def _browser_candidates() -> list[str]:
+    """Browsers to try, in order. "" is Playwright's own Chromium (needs a ~150 MB download);
+    "msedge"/"chrome" reuse a browser that is already installed (no download)."""
+    chosen = (os.getenv("JARVIS_BROWSER_CHANNEL") or "").strip().lower()
+    if chosen in {"chromium", "bundled"}:
+        return [""]
+    if chosen in {"msedge", "edge", "chrome"}:
+        return ["msedge" if chosen == "edge" else chosen]
+    return ["", "msedge", "chrome"]
+
+
+def _launch_browser(pw):
+    """Launch the first available browser. A fresh, separate profile is used: no cookies or
+    logins from the user's normal browser are read or stored."""
+    headless = (os.getenv("JARVIS_BROWSER_HEADLESS") or "").strip().lower() in {"1", "true", "yes"}
+    errors = []
+    for channel in _browser_candidates():
+        try:
+            options = {"headless": headless}
+            if channel:
+                options["channel"] = channel
+            return pw.chromium.launch(**options), channel or "chromium"
+        except Exception as exc:
+            errors.append(f"{channel or 'chromium'}: {type(exc).__name__}")
+    raise RuntimeError("No browser could be started for automation (" + "; ".join(errors) + ").")
+
+
+def browser_automation_status() -> dict:
+    """What browser automation can use on this PC, without launching anything."""
+    import shutil
+
+    status = {"playwright": sync_playwright is not None, "bundled_chromium": False, "installed_browsers": []}
+    local = os.getenv("LOCALAPPDATA") or ""
+    if local and os.path.isdir(os.path.join(local, "ms-playwright")):
+        status["bundled_chromium"] = any(
+            name.startswith("chromium") for name in os.listdir(os.path.join(local, "ms-playwright"))
+        )
+    program_dirs = [os.getenv("ProgramFiles(x86)") or "", os.getenv("ProgramFiles") or "", local]
+    for name, rel in (("msedge", r"Microsoft\Edge\Application\msedge.exe"), ("chrome", r"Google\Chrome\Application\chrome.exe")):
+        if shutil.which(name) or any(base and os.path.isfile(os.path.join(base, rel)) for base in program_dirs):
+            status["installed_browsers"].append(name)
+    status["ready"] = status["playwright"] and (status["bundled_chromium"] or bool(status["installed_browsers"]))
+    status["download_needed"] = status["playwright"] and not status["ready"]
+    return status
+
+
 # ─────────────────────────────────────────
 # BrowserWorker (Playwright thread)
 # ─────────────────────────────────────────
@@ -72,18 +118,34 @@ class BrowserWorker(threading.Thread):
 
         self.tasks = Queue()
         self.stop_signal = False
+        self.ready = threading.Event()  # set once the browser started (or failed to)
+        self.launch_error = ""
+        self.engine = ""
 
     def run(self):
+        global _pw_worker
         if sync_playwright is None:
+            self.launch_error = _playwright_hint()
+            self.ready.set()
             return
 
         IDLE_TIMEOUT = 600.0  # 10 minutos de inactividad
         last_activity = _time.time()
 
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=False)
-            ctx = browser.new_context(viewport={"width": 1536, "height": 864})
-            page = ctx.new_page()
+            try:
+                browser, self.engine = _launch_browser(pw)
+                ctx = browser.new_context(viewport={"width": 1536, "height": 864})
+                page = ctx.new_page()
+            except Exception as exc:
+                self.launch_error = str(exc)
+                services.log_event("browser_worker_launch_failed", error=type(exc).__name__)
+                self.ready.set()
+                with playwright_lock:
+                    if _pw_worker is self:
+                        _pw_worker = None
+                return
+            self.ready.set()
 
             try:
                 while not self.stop_signal:
@@ -125,12 +187,15 @@ class BrowserWorker(threading.Thread):
                     print(f"[WARN BROWSER] Error en limpieza final: {e}")
 
                 # Zombie Reaper: Marcamos globalmente que el worker ha muerto
-                global _pw_worker
                 with playwright_lock:
                     if _pw_worker == self:
                         _pw_worker = None
 
     def execute(self, fn, *args, timeout=35):
+        if not self.ready.wait(timeout=60):
+            return "Error: the automation browser did not start in time."
+        if self.launch_error:
+            raise RuntimeError(self.launch_error)
         event = threading.Event()
         container = {"result": None, "error": None}
         self.tasks.put((fn, args, container, event))
@@ -153,6 +218,9 @@ def _ensure_pw_worker():
 # ─────────────────────────────────────────
 # URL Normalization
 # ─────────────────────────────────────────
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
 def _normalizar_destino_web(destino: str) -> str:
     destino = (destino or "").strip()
     destino = destino.strip(" \t\r\n\"'`\u201c\u201d")
@@ -177,6 +245,9 @@ def _normalizar_destino_web(destino: str) -> str:
 
     if re.match(r"^https?://", destino, flags=re.IGNORECASE):
         parsed = urlparse(destino)
+        if (parsed.hostname or "").lower() in _LOOPBACK_HOSTS:
+            # A page on this PC (e.g. a local dev server): open it, never turn it into a web search.
+            return urlunparse(parsed)
         host = (parsed.netloc or "").strip().rstrip(".")
         if host and "." not in host and re.match(r"^[a-z0-9-]+$", host, flags=re.IGNORECASE):
             host = f"{host}.com"
@@ -267,10 +338,13 @@ def _pw_goto(page, url):
 
 
 def _pw_click(page, selector):
+    looks_like_css = selector.startswith(("#", ".", "[", "/", "xpath=", "css="))
     try:
         page.locator(selector).first.click(timeout=8000)
         return f"Click ejecutado en selector '{selector}'."
     except Exception:
+        if looks_like_css:
+            raise  # a CSS/XPath selector is not visible text; do not wait a second time
         page.get_by_text(selector, exact=False).first.click(timeout=8000)
         return f"Click ejecutado por texto '{selector}'."
 
@@ -347,6 +421,13 @@ def navegar_en_navegador(destino: str) -> str:
         return f"Error al navegar: {e}"
 
 
+def _short_browser_error(action: str, selector: str, exc: Exception) -> str:
+    text = str(exc)
+    if "Timeout" in text:
+        return f"Could not {action}: nothing matching '{selector[:80]}' was found on the page."
+    return f"Could not {action} ({text.splitlines()[0][:160] if text else type(exc).__name__})."
+
+
 @tool
 def click_en_navegador(selector: str) -> str:
     """Hace click en la página actual (CSS/XPath o texto visible)."""
@@ -354,7 +435,7 @@ def click_en_navegador(selector: str) -> str:
         worker = _ensure_pw_worker()
         return worker.execute(_pw_click, selector)
     except Exception as e:
-        return f"Error al hacer click: {e}"
+        return _short_browser_error("click", selector, e)
 
 
 @tool
@@ -364,7 +445,7 @@ def escribir_en_navegador(selector: str, texto: str, enter: bool = False) -> str
         worker = _ensure_pw_worker()
         return worker.execute(_pw_write, selector, texto, enter)
     except Exception as e:
-        return f"Error al escribir en navegador: {e}"
+        return _short_browser_error("type", selector, e)
 
 
 @tool
@@ -463,3 +544,16 @@ def buscar_en_wikipedia(consulta: str) -> str:
         if _abrir_en_navegador_sistema(url):
             return f"Abriendo '{query_limpio}' en Wikipedia."
         return f"Error al abrir Wikipedia: {e}"
+
+
+def _close_browser_for_emergency_stop() -> None:
+    """Emergency STOP closes the automation browser; it does not undo pages already submitted."""
+    cerrar_navegador_playwright.invoke({})
+
+
+try:
+    from core.security import emergency_stop as _emergency_stop
+
+    _emergency_stop.register_cancel_hook("browser_automation", _close_browser_for_emergency_stop)
+except Exception:
+    pass

@@ -14,11 +14,12 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Gemini chat with tools (function calling), Thanglish replies | VERIFIED | Live: "system condition enna" → tool run → Thanglish answer |
 | Clear rate-limit / bad-key / network errors | VERIFIED | `llm_rate_limited`, `llm_auth_failed`, `llm_timeout`, `llm_network` (tested) |
 | Connection test (model, latency, problem) | VERIFIED (unit) | `POST /api/security/ai-test`; "nee ok-a?" uses it |
-| Backup AI when Gemini is rate-limited | VERIFIED | Groq `openai/gpt-oss-120b`; real fallback observed (`llm_fallback_succeeded`) |
+| Backup AI when Gemini is rate-limited | VERIFIED | Gemini backup model `gemini-3.1-flash-lite` (real: answered while 2.5-flash daily quota was exhausted), then Groq, then Ollama |
+| Real Gemini tool use, context, multi-step | VERIFIED | Live: tool ran and result fed back; codeword remembered across turns; two tools chained in one request |
 | Local AI (Ollama `qwen2.5:3b`, Q4_K_M, 1.93 GB) | VERIFIED | Real inference: cold load 150 s once, then 0.2–3.5 s; 100% on the T500 GPU; tool calling works; Thanglish quality poor |
 | AI mode `cloud_first` / `local_first` / `local_only` | VERIFIED (unit) | Default cloud_first: Gemini → Groq → Ollama |
 | Offline everyday commands (no AI call) | VERIFIED (unit) | apps, media, brightness, screenshot, timers, alarms, notes, summary, self check, layouts |
-| Streaming text while typing | PARTIAL | Tool replies arrive whole; plain chat streams |
+| Streaming text while typing | PARTIAL | `/api/chat/stream` on the default pipeline sends the reply in one final event; token streaming exists only in the legacy pipeline (now with fallback) |
 
 ## Voice
 
@@ -29,6 +30,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Microphone selection, unplugged fallback, reconnect | PARTIAL | Real mic listed/selected/reopened; physical unplug not tested (built-in mic only) |
 | Stop speaking (Esc / STOP VOICE) | VERIFIED | Real browser: Esc stopped the spoken briefing; button hides after speech |
 | Tamil / Thanglish transcription accuracy | BLOCKED | Needs real recordings; harness `scripts/evaluate_stt.py` ready |
+| STT language: follow UI / auto-detect / forced | VERIFIED | Real: English audio detected as en (p=1.0) with UI in Tamil and `JARVIS_STT_LANGUAGE=auto` |
+| Tamil spoken replies (offline) | BLOCKED | No Piper Tamil voice exists; Windows Tamil voice must be added in Settings first |
 | Offline "Hey Jarvis" wake word | UNVERIFIED | Engine + real mic verified; your own voice not yet confirmed |
 | Gemini Live two-way voice, interruption | UNVERIFIED | Used by voice button and wake word; natural voice |
 | Spoken replies | VERIFIED | Gemini voice when quota allows, otherwise local `ryan-high` |
@@ -64,7 +67,9 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | File details (size, dates, read-only, link) | VERIFIED (unit) | Allowed folders only |
 | Install software with winget (approval, user scope) | PARTIAL | Real search and identity check; real install path stopped as already installed; installs unit-tested only |
 | Full diagnostics (GPU, disk health, battery time) | VERIFIED | Real readings; unavailable shown as unavailable |
-| Browser click/type need approval | VERIFIED (unit) | Playwright Chromium not downloaded (BLOCKED on approval) |
+| Browser click/type need approval | VERIFIED (unit) | |
+| Browser automation (navigate, type, click, read) | VERIFIED | Real: installed Edge via Playwright, local test page; no Chromium download needed |
+| Emergency STOP stops winget install and closes automation browser | VERIFIED (unit) | Does not undo actions already completed |
 | PDF / spreadsheet understanding | MISSING | |
 
 ## Companion, memory, reminders
@@ -88,6 +93,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Tool risk levels, confirmation, path confinement, audit | VERIFIED | |
 | API key in Windows Credential Manager | MISSING | Key is in `.env` (git-ignored) |
 | Persistent multi-step tasks resumed after restart | VERIFIED | Unit tests + real UI run: resume, approval pause, approve, done 3/3 |
+| Natural language -> saved plan -> tools -> approval | VERIFIED | Real Gemini: built a 3-step task, ran 2, paused install for approval, reported accurately |
+| Tray icon | MISSING | Needs the `pystray` package (approval) |
 | Task control panel (approve / reject / resume / cancel) | VERIFIED | Real Edge + backend end-to-end; backend re-checks eligibility |
 
 ## Integrations

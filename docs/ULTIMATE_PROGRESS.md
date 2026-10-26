@@ -9,7 +9,9 @@ was checked, and what is still open. Nothing here has been pushed to GitHub.
   (`qwen2.5:3b`), `JARVIS_AI_MODE=cloud_first`.
 - `pytest -q`: 1065 passed before this phase work; 1077 passed, 1 skipped after
   Phase B; 1091 passed, 1 skipped after Phase A; 1125 passed, 1 skipped after
-  Phase C and the task panel. `ruff check src/backend` clean throughout.
+  Phase C and the task panel; 1146 passed, 1 skipped after the Gemini/browser/voice
+  continuation. `ruff check src/backend` clean throughout; `pip_audit` found no
+  known vulnerabilities.
 
 ## Phase A: offline voice
 
@@ -161,6 +163,80 @@ Added:
   normal browser.
 - UI fix found during the real-browser check: the microphone selector with a
   long device name pushed the header off-screen; its width is now capped.
+
+## Continuation: Gemini, browser, voice, automatic tasks
+
+Gemini (real API, key from `.env`, never printed or logged; 0 key matches in
+the backend log):
+- Key valid (model list works). `gemini-2.5-flash` returned 429
+  RESOURCE_EXHAUSTED: free tier is 20 requests/day per model, so the daily
+  quota was used up. Free quotas are per model, so JARVIS now tries a backup
+  Gemini model (`gemini-3.1-flash-lite`, verified to make tool calls) before
+  Groq. `gemini-2.5-flash-lite` is retired for new users (404);
+  `gemini-flash-latest` returned 503 (busy) when tested.
+- Real results through the app: AI test OK in 2.2 s (reports the model that
+  actually answered); battery/CPU question ran `informacion_sistema` and the
+  answer used its result; a codeword was remembered on the next turn; one
+  request chained `listar_pantallas` and `informacion_sistema`.
+- Natural language -> plan -> tools: "Create a saved multi-step task called
+  Evening check ... run it now" made Gemini call `ejecutar_tarea_multipaso`
+  with three real tools; diagnostics and screen listing ran, the winget step
+  paused for approval, and the reply described exactly that. Before a fix,
+  Gemini picked the older `crear_plan_acciones` (limited tool list) and the
+  user only saw "The requested action failed"; both tool descriptions now say
+  which to use.
+- Streaming: on the default pipeline `/api/chat/stream` delivers the reply in
+  one final event (no token-by-token output). Token streaming exists only in
+  the legacy pipeline; it now falls back to the backup provider when the
+  primary fails before the first token and reports the real error code.
+- Timeouts (10 s cloud, no automatic retries), quota/auth/network error codes
+  and the UI's AI test were already in place.
+
+Browser automation (no Chromium download needed):
+- JARVIS now launches Playwright's Chromium if present, else the installed
+  Microsoft Edge, else Chrome (`JARVIS_BROWSER_CHANNEL`), with a fresh
+  separate profile (no user cookies or logins). A browser that cannot start
+  gives one clear error instead of a 35 s timeout.
+- Real check with Edge on a local test page: navigate (1.4 s), type, click,
+  read the result ("Hello, Prawin"); the page's "ignore previous
+  instructions" text came back labelled as web content; a missing element
+  gives a one-line error after 8 s and the browser keeps working.
+- Fixed: an explicit local URL (`http://127.0.0.1:8765/`) was turned into a
+  Google search, sending it to Google. Loopback URLs now open directly.
+- Emergency STOP now also cancels a running winget install and closes the
+  automation browser (it does not undo completed actions).
+
+Voice:
+- Installed model: faster-whisper `small` (model.bin 484 MB), multilingual,
+  100 languages including Tamil.
+- `JARVIS_STT_LANGUAGE`: follow the UI language (default), `auto` (Whisper
+  detects; for mixed Tamil/English), or a fixed code. Real: English audio was
+  detected as `en` (probability 1.0) with the UI in Tamil. The transcriber
+  reports the detected language and audio length (never the words) and that
+  processing was local.
+- Tamil/Thanglish accuracy: still BLOCKED. Needed: 20+ WAV (or WebM/OGG)
+  clips, 16 kHz+ mono, 2–10 s each, your own voice, a mix of pure Tamil,
+  Thanglish and English commands, plus `manifest.csv` with
+  `file,language,kind,reference` where `reference` is exactly what was said
+  (Tamil in Tamil script, Thanglish in English letters). Then run
+  `scripts/evaluate_stt.py <folder>`.
+- Tamil text-to-speech: no offline option is installed. Piper has no Tamil
+  voice (178 voices, 58 languages). Windows has only English voices here; the
+  free "Microsoft Valluvar" Tamil voice can be added in Settings > Time &
+  language > Speech (an OS step only you can do; JARVIS would then also need
+  a Windows-voice engine). Cloud options: Gemini TTS (quota-limited).
+
+Setup and startup: the first-run wizard already takes the provider and key,
+validates it with a live call, optionally saves it to `.env` and switches the
+running AI without a restart; auto-start uses a visible Startup-folder
+shortcut or logon task with a header toggle; the launcher has a watchdog. No
+tray icon (needs the `pystray` package: approval).
+
+Not changed: an orphaned test backend from the previous session was still
+listening on port 5002 when this continuation started; stopping it was
+refused by the tool permission system, so it must be closed manually (Task
+Manager: the `python.exe` running `src/backend/jarvis_backend.py` started at
+19:14) before starting JARVIS normally.
 
 ## Phases D–I
 

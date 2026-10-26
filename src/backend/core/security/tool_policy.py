@@ -85,9 +85,18 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "abrir_configuracion_windows": ToolPolicy("abrir_configuracion_windows", "elevated", ("admin",), False, True),
     "crear_carpeta": ToolPolicy("crear_carpeta", "elevated", ("admin",), False, True),
     "buscar_duplicados": ToolPolicy("buscar_duplicados", "elevated", ("admin",), False, True),
+    "informacion_archivo": ToolPolicy("informacion_archivo", "elevated", ("admin",), False, True),
     "archivos_grandes": ToolPolicy("archivos_grandes", "elevated", ("admin",), False, True),
     # Clipboard: owner-only, on request only, contents never logged.
-    "leer_portapapeles": ToolPolicy("leer_portapapeles", "elevated", ("admin",), False, True),
+    # Reading needs a yes each time: the text may go to a cloud AI.
+    "leer_portapapeles": ToolPolicy("leer_portapapeles", "critical", ("admin",), True, True),
+    "limpiar_portapapeles": ToolPolicy("limpiar_portapapeles", "elevated", ("admin",), False, True),
+    # Software: searching is read-only; installing always needs explicit approval.
+    "diagnostico_sistema": ToolPolicy("diagnostico_sistema", "elevated", ("admin",), False, True),
+    "buscar_programa": ToolPolicy("buscar_programa", "elevated", ("admin",), False, True),
+    "ver_programa": ToolPolicy("ver_programa", "elevated", ("admin",), False, True),
+    "instalar_programa": ToolPolicy("instalar_programa", "critical", ("admin",), True, True),
+    "cancelar_instalacion": ToolPolicy("cancelar_instalacion", "elevated", ("admin",), False, True),
     "ejecutar_tarea_multipaso": ToolPolicy("ejecutar_tarea_multipaso", "elevated", ("admin",), False, True),
     "ver_tareas": ToolPolicy("ver_tareas", "elevated", ("admin",), False, True),
     "reanudar_tarea": ToolPolicy("reanudar_tarea", "elevated", ("admin",), False, True),
@@ -97,6 +106,12 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "ajustar_brillo": ToolPolicy("ajustar_brillo", "elevated", ("admin",), False, True),
     "captura_pantalla": ToolPolicy("captura_pantalla", "elevated", ("admin",), False, True),
     "organizar_ventanas": ToolPolicy("organizar_ventanas", "elevated", ("admin",), False, True),
+    # Browser automation: clicking and typing can submit forms, buy or send messages, so each one
+    # needs a yes (page text is untrusted and could try to steer the assistant).
+    "click_en_navegador": ToolPolicy("click_en_navegador", "critical", ("admin",), True, True),
+    "escribir_en_navegador": ToolPolicy("escribir_en_navegador", "critical", ("admin",), True, True),
+    "listar_pantallas": ToolPolicy("listar_pantallas", "elevated", ("admin",), False, True),
+    "mover_ventana_a_pantalla": ToolPolicy("mover_ventana_a_pantalla", "elevated", ("admin",), False, True),
     "poner_temporizador": ToolPolicy("poner_temporizador", "elevated", ("admin",), False, True),
     "poner_alarma": ToolPolicy("poner_alarma", "elevated", ("admin",), False, True),
     "guardar_nota": ToolPolicy("guardar_nota", "elevated", ("admin",), False, True),

@@ -157,3 +157,17 @@ def test_system_info_reports_resources_or_unavailability():
 
 def test_settings_page_rejects_unknown_pages():
     assert "Unknown settings page" in files.abrir_configuracion_windows.invoke({"pagina": "regedit"})
+
+
+def test_file_info_reports_real_metadata_inside_roots_only(root: Path, tmp_path: Path):
+    (root / "report.pdf").write_bytes(b"x" * 2048)
+    (root / ".env").write_text("SECRET=1", encoding="utf-8")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("no", encoding="utf-8")
+    text = files.informacion_archivo.invoke({"ruta": str(root / "report.pdf")})
+    assert "pdf file" in text and "Size: 2.0 KB" in text and "Modified:" in text
+    assert "folder" in files.informacion_archivo.invoke({"ruta": str(root)})
+    assert "outside" in files.informacion_archivo.invoke({"ruta": str(outside)}).lower()
+    assert "protected" in files.informacion_archivo.invoke({"ruta": str(root / ".env")})
+    assert "outside" in files.informacion_archivo.invoke({"ruta": str(root / ".." / "outside.txt")}).lower()
+    assert "Not found" in files.informacion_archivo.invoke({"ruta": str(root / "missing.txt")})

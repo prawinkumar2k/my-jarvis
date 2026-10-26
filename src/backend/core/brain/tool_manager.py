@@ -289,13 +289,16 @@ class _ToolReportedFailure(RuntimeError):
     pass
 
 
-def _blocked_error(reason: str) -> ControlledToolBlockedError:
+def _blocked_error(reason: str, tool_name: str = "", args: dict | None = None) -> ControlledToolBlockedError:
     public_reason = str(reason or "").strip()
     normalized_reason = public_reason.lower()
     if "authoriz" in normalized_reason or "autoriz" in normalized_reason:
         return ToolAuthorizationRequiredError(public_reason)
     if "confirm" in normalized_reason:
-        return ToolConfirmationRequiredError(public_reason)
+        from core.security.confirmation_preview import preview
+
+        details = preview(tool_name, args or {})
+        return ToolConfirmationRequiredError(f"{public_reason} {details}".strip())
     return ToolPolicyBlockedError(public_reason)
 
 
@@ -377,7 +380,7 @@ def _invoke_tool_once(request: CommandRequest, step: ActionStep) -> Any:
                 raise ToolPolicyBlockedError() from exc
             if not allowed:
                 outcome = "blocked"
-                blocked_error = _blocked_error(reason)
+                blocked_error = _blocked_error(reason, tool_name, args)
                 result_preview = blocked_error.diagnostic_code
                 elapsed = (_time.perf_counter() - started) * 1000.0
                 obs_tool(

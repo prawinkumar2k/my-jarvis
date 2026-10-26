@@ -17,6 +17,7 @@ import platform
 import shutil
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import psutil
@@ -580,3 +581,29 @@ def archivos_grandes(carpeta: str = "", cantidad: int = 10) -> str:
     if not largest:
         return f"No files in {_display(path)}."
     return f"Largest files in {_display(path)}:\n" + "\n".join(f"- {_human_size(s)}  {_display(p)}" for p, s in largest)
+
+
+@tool
+def informacion_archivo(ruta: str) -> str:
+    """Details of one file or folder inside the allowed folders: type, size, created/modified dates,
+    read-only flag, and whether it is a shortcut/link."""
+    raw = Path(str(ruta or "").strip().strip('"')).expanduser()
+    path, error = _resolve_target(ruta, must_exist=True, allow_root=True)
+    if path is None:
+        return error
+    try:
+        info = path.stat()
+    except OSError as exc:
+        _log_error("file_info_error", exc)
+        return f"Windows did not allow reading details of {_display(path)}."
+    kind = "folder" if path.is_dir() else (path.suffix.lower().lstrip(".") or "file") + " file"
+    lines = [f"{_display(path)}: {kind}"]
+    if path.is_file():
+        lines.append(f"Size: {_human_size(info.st_size)}")
+    lines.append(f"Modified: {datetime.fromtimestamp(info.st_mtime):%Y-%m-%d %H:%M}")
+    lines.append(f"Created: {datetime.fromtimestamp(info.st_ctime):%Y-%m-%d %H:%M}")
+    if not os.access(path, os.W_OK):
+        lines.append("Read-only")
+    if raw.is_absolute() and raw.is_symlink():
+        lines.append("This is a link; details are for its target inside the allowed folders.")
+    return "\n".join(lines)

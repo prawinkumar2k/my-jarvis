@@ -54,7 +54,7 @@ def read_clipboard_text() -> str | None:
     try:
         handle = user32.GetClipboardData(CF_UNICODETEXT)
         if not handle:
-            return ""
+            return ""  # empty, or only non-text data (see clipboard_has_data)
         pointer = kernel32.GlobalLock(handle)
         if not pointer:
             return None
@@ -62,6 +62,23 @@ def read_clipboard_text() -> str | None:
             return ctypes.wstring_at(pointer)
         finally:
             kernel32.GlobalUnlock(handle)
+    finally:
+        user32.CloseClipboard()
+
+
+def clipboard_has_data() -> bool:
+    """True when the clipboard holds anything at all (image, files, text)."""
+    return bool(IS_WINDOWS and ctypes.windll.user32.CountClipboardFormats())
+
+
+def clear_clipboard() -> bool:
+    if not IS_WINDOWS:
+        return False
+    user32, _ = _api()
+    if not _open(user32):
+        return False
+    try:
+        return bool(user32.EmptyClipboard())
     finally:
         user32.CloseClipboard()
 
@@ -103,7 +120,9 @@ def leer_portapapeles() -> str:
     if text is None:
         return "Could not open the clipboard (another app may be using it)."
     if not text.strip():
-        return "The clipboard has no text."
+        if clipboard_has_data():
+            return "The clipboard holds an image, files or other non-text data, which I can't read."
+        return "The clipboard is empty."
     if looks_sensitive(text):
         return "The clipboard holds something that looks like a password, key, code or card number, so I won't read it out."
     clipped = text[:MAX_RETURN_CHARS]
@@ -124,3 +143,13 @@ def copiar_al_portapapeles(texto: str) -> str:
     if not write_clipboard_text(value):
         return "Windows did not accept the clipboard change."
     return f"Copied {len(value)} characters to the clipboard."
+
+
+@tool
+def limpiar_portapapeles() -> str:
+    """Clear the clipboard (for example after copying a password)."""
+    if not IS_WINDOWS:
+        return "Clipboard tools are only available on Windows."
+    if not clear_clipboard():
+        return "Could not open the clipboard (another app may be using it)."
+    return "Clipboard cleared."

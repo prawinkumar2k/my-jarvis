@@ -157,9 +157,10 @@ def layout_rects(layout: str, count: int, area: tuple[int, int, int, int]) -> li
 
 
 @tool
-def organizar_ventanas(ventanas: str, distribucion: str = "split") -> str:
-    """Arrange open windows on the main screen. ventanas: comma-separated window/app names in order,
-    e.g. 'Chrome, Visual Studio Code' (first goes left). distribucion: split (left/right), grid (2x2), full."""
+def organizar_ventanas(ventanas: str, distribucion: str = "split", pantalla: str = "1") -> str:
+    """Arrange open windows on one screen. ventanas: comma-separated window/app names in order,
+    e.g. 'Chrome, Visual Studio Code' (first goes left). distribucion: split (left/right), grid (2x2), full.
+    pantalla: screen number (1 = primary)."""
     if not IS_WINDOWS:
         return "Window layouts are only available on Windows."
     from tools.desktop_control import _find_window, _window_snapshot
@@ -180,7 +181,14 @@ def organizar_ventanas(ventanas: str, distribucion: str = "split") -> str:
     if not found:
         return "None of those windows are open: " + ", ".join(n for n, _ in missing)
     layout = str(distribucion or "split").strip().lower()
-    rects = layout_rects(layout if layout in {"split", "grid", "full"} else "split", len(found), _work_area())
+    from tools.displays import _pick_monitor, list_monitors
+
+    monitors = list_monitors()
+    target = _pick_monitor(pantalla, monitors, None) if monitors else None
+    if monitors and target is None:
+        return f"There is no screen '{pantalla}'. {len(monitors)} connected."
+    area = target["work"] if target else _work_area()
+    rects = layout_rects(layout if layout in {"split", "grid", "full"} else "split", len(found), area)
     user32 = ctypes.windll.user32
     for (_name, win), (x, y, w, h) in zip(found, rects, strict=True):
         hwnd = int(win["handle"])

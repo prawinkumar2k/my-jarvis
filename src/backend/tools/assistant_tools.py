@@ -265,3 +265,12 @@ def resumen_del_dia() -> str:
     problems = [k for k, (ok, _) in health.items() if not ok]
     parts.append("All systems OK." if not problems else "Needs attention: " + ", ".join(problems) + ".")
     return " ".join(parts)
+
+
+@tool
+def diagnostico_sistema() -> str:
+    """Full live system report: CPU, memory, every drive and its health, battery, GPU usage and VRAM,
+    biggest processes, and whether winget, FFmpeg and Ollama are available."""
+    from core import diagnostics
+
+    return diagnostics.summarize(diagnostics.collect())

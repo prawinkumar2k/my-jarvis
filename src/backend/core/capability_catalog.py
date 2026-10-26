@@ -86,7 +86,17 @@ def _entries() -> list[Capability]:
         Capability("calendar_email", "Calendar and email", NOT_IMPLEMENTED),
         Capability("coding_agent", "Editing and testing code projects", NOT_IMPLEMENTED),
         Capability("duplicates", "Duplicate-file and large-file finder (read-only)", VERIFIED),
-        Capability("monitors", "Multi-monitor window layouts", NOT_IMPLEMENTED),
+        Capability("window_layouts", "Arranging windows side by side or in a grid (main screen)", VERIFIED),
+        Capability("media_keys", "Play/pause/next/previous for any media player", UNTESTED,
+                   "Sends the Windows media keys; the player that reacts is chosen by Windows."),
+        Capability("brightness", "Laptop screen brightness", VERIFIED),
+        Capability("screenshot", "Saving a screenshot on request", VERIFIED),
+        Capability("timers_alarms", "Timers and alarms (spoken, survive restarts)", VERIFIED),
+        Capability("notes", "Voice notes: save, read, delete", VERIFIED),
+        Capability("health_check", "Self check: internet, AI, mic, wake word, battery", VERIFIED),
+        Capability("daily_summary", "Daily summary of notes, reminders and system state", VERIFIED),
+        Capability("wifi_bluetooth_toggle", "Turning Wi-Fi/Bluetooth on or off", NOT_IMPLEMENTED,
+                   "Needs admin rights on Windows; JARVIS opens the Settings page instead."),
     ]
 
 

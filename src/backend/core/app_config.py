@@ -178,7 +178,13 @@ def get_app_config() -> AppConfig:
     with _APP_CONFIG_LOCK:
         global _APP_CONFIG
         if _APP_CONFIG is None:
-            _APP_CONFIG = build_app_config(None)
+            # Use the user's jarvis_settings when available instead of the
+            # hard-coded defaults (which point at Madrid).
+            try:
+                import jarvis_settings as settings_module
+            except ImportError:
+                settings_module = None
+            _APP_CONFIG = build_app_config(settings_module)
         return _APP_CONFIG
 
 

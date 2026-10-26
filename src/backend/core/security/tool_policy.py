@@ -88,6 +88,16 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "archivos_grandes": ToolPolicy("archivos_grandes", "elevated", ("admin",), False, True),
     # Clipboard: owner-only, on request only, contents never logged.
     "leer_portapapeles": ToolPolicy("leer_portapapeles", "elevated", ("admin",), False, True),
+    # Everyday controls and companion tools: owner-only, reversible, audited.
+    "control_multimedia": ToolPolicy("control_multimedia", "elevated", ("admin",), False, True),
+    "ajustar_brillo": ToolPolicy("ajustar_brillo", "elevated", ("admin",), False, True),
+    "captura_pantalla": ToolPolicy("captura_pantalla", "elevated", ("admin",), False, True),
+    "organizar_ventanas": ToolPolicy("organizar_ventanas", "elevated", ("admin",), False, True),
+    "poner_temporizador": ToolPolicy("poner_temporizador", "elevated", ("admin",), False, True),
+    "poner_alarma": ToolPolicy("poner_alarma", "elevated", ("admin",), False, True),
+    "guardar_nota": ToolPolicy("guardar_nota", "elevated", ("admin",), False, True),
+    "leer_notas": ToolPolicy("leer_notas", "elevated", ("admin",), False, True),
+    "borrar_nota": ToolPolicy("borrar_nota", "elevated", ("admin",), False, True),
     "copiar_al_portapapeles": ToolPolicy("copiar_al_portapapeles", "elevated", ("admin",), False, True),
     "copiar_archivo": ToolPolicy("copiar_archivo", "elevated", ("admin",), False, True),
     "mover_archivo": ToolPolicy("mover_archivo", "critical", ("admin",), True, True),

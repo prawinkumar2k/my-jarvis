@@ -2760,7 +2760,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     setTimeout(checkReminders, 4000);
-    setInterval(checkReminders, 15000);
+    setInterval(checkReminders, 5000);
 
     // Follow language changes made by voice ("switch to English").
     async function followBackendLanguage() {

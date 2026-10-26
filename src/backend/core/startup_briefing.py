@@ -32,10 +32,40 @@ def collect_status() -> dict:
     try:
         from core.reminders import reminder_store
 
-        status["reminders"] = len(reminder_store.pending())
+        pending = reminder_store.pending()
+        status["reminders"] = len(pending)
+        today = status["now"].strftime("%Y-%m-%d")
+        status["reminders_today"] = [r["text"] for r in pending if r["due"].startswith(today)][:2]
     except Exception:
         status["reminders"] = 0
+    weather = _weather_with_timeout(3.0)
+    if weather:
+        status["weather"] = weather
     return status
+
+
+def _weather_with_timeout(seconds: float) -> tuple[str, str] | None:
+    """(description, temperature °C) for the home location, or None if slow/offline."""
+    import threading
+
+    result: list = []
+
+    def fetch():
+        try:
+            from tools.utilities import _obtener_clima_logic
+
+            from core.app_config import get_default_location
+
+            desc, temp = _obtener_clima_logic(get_default_location())
+            if desc:
+                result.append((str(desc), str(temp or "")))
+        except Exception:
+            pass
+
+    worker = threading.Thread(target=fetch, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    return result[0] if result else None
 
 
 def _time_12h(now: datetime) -> str:
@@ -55,7 +85,12 @@ def build_briefing(language: str, status: dict | None = None) -> str:
             parts.append(f"Battery {s['battery']} percent, {charge}.")
         if "cpu" in s:
             parts.append(f"CPU {s['cpu']} percent, memory {s['ram']} percent use-la irukku.")
-        if s.get("reminders"):
+        if s.get("weather"):
+            desc, temp = s["weather"]
+            parts.append(f"Weather: {desc}" + (f", {temp} degree." if temp else "."))
+        if s.get("reminders_today"):
+            parts.append("Inniku reminders: " + "; ".join(s["reminders_today"]) + ".")
+        elif s.get("reminders"):
             parts.append(f"{s['reminders']} reminder pending-la irukku.")
         parts.append("Ella systems-um ready. Enna pannanum?")
     elif lang.startswith("es"):
@@ -75,7 +110,12 @@ def build_briefing(language: str, status: dict | None = None) -> str:
             parts.append(f"Battery at {s['battery']} percent{', charging' if s['charging'] else ''}.")
         if "cpu" in s:
             parts.append(f"CPU at {s['cpu']} percent, memory at {s['ram']} percent.")
-        if s.get("reminders"):
+        if s.get("weather"):
+            desc, temp = s["weather"]
+            parts.append(f"Weather: {desc}" + (f", {temp} degrees." if temp else "."))
+        if s.get("reminders_today"):
+            parts.append("Today: " + "; ".join(s["reminders_today"]) + ".")
+        elif s.get("reminders"):
             parts.append(f"You have {s['reminders']} pending reminder{'s' if s['reminders'] != 1 else ''}.")
         parts.append("All systems ready.")
     return " ".join(parts)

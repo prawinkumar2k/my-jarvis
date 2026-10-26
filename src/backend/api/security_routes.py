@@ -8,6 +8,7 @@ from core.jarvis_observability import obs_snapshot
 from quart import Blueprint, jsonify, request
 
 security_bp = Blueprint("security", __name__)
+_background_tasks: set = set()  # keep references so tasks are not garbage-collected
 
 # Injected dependencies
 _security_snapshot = None
@@ -187,7 +188,8 @@ async def _restore_wake_word():
         from voice.wake_word import remembered_enabled, wake_word_listener
 
         if remembered_enabled():
-            await asyncio.to_thread(wake_word_listener.start)
+            # Load the models in the background so the server starts serving now.
+            _background_tasks.add(asyncio.create_task(asyncio.to_thread(wake_word_listener.start)))
     except Exception as exc:
         print(f"[WARN wake_word] restore failed: {type(exc).__name__}")
 

@@ -168,6 +168,39 @@ def apply_window_icon(hwnd: int) -> bool:
     return bool(small or big)
 
 
+def start_backend_watchdog(holder, spawn, *, interval=5.0, max_restarts=3, window_s=600.0):
+    """Restart the backend if it exits unexpectedly (bounded to avoid crash loops).
+
+    holder: one-item list with the current Popen; holder is set to [None] on
+    shutdown so the watchdog stops instead of restarting a deliberate exit.
+    """
+    import threading
+
+    restarts: list[float] = []
+
+    def loop():
+        while True:
+            time.sleep(interval)
+            proc = holder[0]
+            if proc is None:
+                return
+            code = proc.poll()
+            if code is None:
+                continue
+            now = time.monotonic()
+            restarts[:] = [r for r in restarts if now - r < window_s]
+            if len(restarts) >= max_restarts:
+                print(f"[WATCHDOG] Backend keeps exiting (code {code}); not restarting again.")
+                return
+            restarts.append(now)
+            print(f"[WATCHDOG] Backend exited (code {code}); restarting...")
+            holder[0] = spawn()
+
+    thread = threading.Thread(target=loop, name="jarvis-watchdog", daemon=True)
+    thread.start()
+    return thread
+
+
 def is_backend_running(url):
     try:
         response = requests.get(f"{url}/api/status", timeout=1)
@@ -224,12 +257,15 @@ def start_app():
                     log_stream.fileno()
             except (OSError, ValueError):
                 log_stream = None
-            backend_proc = subprocess.Popen(
-                [sys.executable, backend_script],
-                cwd=root_dir,
-                stdout=log_stream,
-                stderr=subprocess.STDOUT if log_stream is not None else None,
-            )
+            def spawn_backend():
+                return subprocess.Popen(
+                    [sys.executable, backend_script],
+                    cwd=root_dir,
+                    stdout=log_stream,
+                    stderr=subprocess.STDOUT if log_stream is not None else None,
+                )
+
+            backend_proc = spawn_backend()
 
             # Wait up to 90s because local ML models can be heavy.
             attempts = 0
@@ -249,6 +285,10 @@ def start_app():
         else:
             print("[SYSTEM] Server is already running.")
 
+        backend_holder = [backend_proc]
+        if backend_proc is not None:
+            start_backend_watchdog(backend_holder, spawn_backend)
+
         # 3. Create desktop window
         window = webview.create_window(
             'J.A.R.V.I.S. - Just A Rather Very Intelligent System',
@@ -263,8 +303,9 @@ def start_app():
 
         def on_closed():
             print("[SYSTEM] Closing application...")
-            if backend_proc:
-                backend_proc.terminate()
+            proc, backend_holder[0] = backend_holder[0], None  # stop the watchdog first
+            if proc:
+                proc.terminate()
             cleanup_temporary_storage()
             os._exit(0)
 

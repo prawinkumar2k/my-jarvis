@@ -8,7 +8,8 @@ was checked, and what is still open. Nothing here has been pushed to GitHub.
 - Branch `feature/jarvis-ultimate`; local AI routing Gemini → Groq → Ollama
   (`qwen2.5:3b`), `JARVIS_AI_MODE=cloud_first`.
 - `pytest -q`: 1065 passed before this phase work; 1077 passed, 1 skipped after
-  Phase B; 1091 passed, 1 skipped after Phase A.
+  Phase B; 1091 passed, 1 skipped after Phase A; 1125 passed, 1 skipped after
+  Phase C and the task panel. `ruff check src/backend` clean throughout.
 
 ## Phase A: offline voice
 
@@ -59,6 +60,10 @@ Stop speaking:
   button (shown only while speaking). Emergency stop already released audio.
 - Fixed a gap: stopping between two queued sentences did not cancel the rest.
   A Node test runs the real `main.js` functions and failed on the old code.
+- Real browser (Edge, headless, real backend): the spoken startup briefing
+  showed STOP VOICE; Esc stopped it mid-sentence ("Audio detenido") and hid
+  the button. Fixed a second bug found there: the button stayed visible after
+  speech ended on its own; verified hidden once the queue finished.
 - This is "press to stop", not barge-in by voice for the local TTS path;
   Gemini Live keeps its existing barge-in.
 
@@ -84,6 +89,79 @@ Tamil / Thanglish:
   `POST /api/security/tasks/<id>/approve|resume|cancel`.
 - Tests: `tests/test_task_engine.py` (8). Not yet exercised from the UI.
 
-## Phases C–I
+## Phase B follow-up: task control panel
+
+- Right-hand control panel lists real tasks from `GET /api/security/tasks`
+  (refresh every 4 s): state, goal, id, active step / total, failed steps,
+  retries, started / finished time, the exact step and arguments awaiting
+  approval, last error, and per-step history.
+- Actions are offered only when eligible and re-checked on the backend (409
+  otherwise): approve, reject (the risky step never runs; task cancelled),
+  resume (pending/interrupted only; never skips an approval), cancel.
+  Approve/resume run in the background (202) so the UI never blocks.
+- Duplicate protection: buttons lock while a request is in flight, and the
+  engine refuses a second concurrent run of the same task.
+- After a restart, tasks left `running` show as stopped/interrupted and can be
+  resumed; completed steps are not repeated. Emergency stop blocks approve and
+  resume. Old `tasks.db` files are upgraded in place (new timestamp columns).
+- Task text is rendered with `textContent` only (no HTML injection).
+- Real end-to-end check (Edge + real backend, isolated data folder): a task
+  of `diagnostico_sistema` -> `listar_pantallas` -> `instalar_programa
+  Gyan.FFmpeg` was resumed from the panel, paused at NEEDS APPROVAL, approved
+  from the panel and finished DONE 3/3 (FFmpeg was already installed, so
+  nothing on the PC changed).
+
+## Phase C: Windows automation
+
+Already present and reused: window list/focus/minimize/maximize/restore/close
+by handle (`desktop_control.py`), split/grid layouts, clipboard read/write with
+secret filtering, file tools confined to allowed roots (symlink and `..`
+resolution before the check, no overwrite, protected `.env`/keys, Recycle Bin
+delete, confirmation for move/organize/delete, SHA-256 duplicate finder),
+Playwright browser tools.
+
+Added:
+- Multi-monitor (`tools/displays.py`): live monitor list (screen 1 =
+  primary), which screen each window is on, `mover_ventana_a_pantalla`
+  (full/left/right/top/bottom/center focus layout), and `organizar_ventanas`
+  now takes a screen. Targets are validated against the current monitors.
+  Display settings are never changed.
+  Real check (one 1920x1080 screen): a Notepad window JARVIS opened was placed
+  at exactly (0,0,960,1008), (240,126,1440,756) and (960,0,960,1008); screen 2
+  and bad positions were refused. Multi-monitor geometry (negative
+  coordinates, unplugged screen, straddling) is unit-tested only; no second
+  monitor was available.
+- Clipboard: `limpiar_portapapeles`; non-text content (images, files) is
+  reported as such. Reading the clipboard now needs a yes each time, and the
+  question says whether the text may go to a cloud AI (Gemini/Groq).
+- Files: `informacion_archivo` (type, size, dates, read-only, link) inside
+  allowed roots only.
+- winget (`tools/winget.py`): `buscar_programa`, `ver_programa`,
+  `instalar_programa`, `cancelar_instalacion`. Argument lists only, validated
+  ids and queries, official `winget` source only, user scope only (a package
+  needing an admin install is reported, never elevated), one install at a
+  time, identity re-verified before install, result checked with
+  `winget list`. The confirmation question shows id, name, version,
+  publisher, source and license (new `confirmation_preview` hook).
+  Real checks: searches for vlc/7zip returned real ids; unknown and malformed
+  ids refused; "install Gyan.FFmpeg" verified identity and stopped as already
+  installed. No new package was installed (only FFmpeg was authorized).
+- Diagnostics (`core/diagnostics.py`, `diagnostico_sistema`,
+  `GET /api/security/diagnostics`): CPU, memory, every drive, disk health
+  (WMI), battery with time left, GPUs (NVIDIA utilization/VRAM via
+  nvidia-smi; others marked "utilization unavailable"), top memory processes,
+  winget/FFmpeg/Ollama status. Unavailable readings are null, never 0. Real
+  run: 3.5 s at 100% CPU; KIOXIA SSD Healthy, T500 and Iris Xe listed.
+- Browser: click and type now require admin plus a yes each time (they can
+  submit, buy or send); the question says what will be clicked/typed and
+  whether Enter submits. Page text returned to the AI is labelled as web
+  content, not instructions. BLOCKED: the Playwright Chromium browser is not
+  downloaded (about 150 MB, needs your approval:
+  `python -m playwright install chromium`); the default mode opens your
+  normal browser.
+- UI fix found during the real-browser check: the microphone selector with a
+  long device name pushed the header off-screen; its width is now capped.
+
+## Phases D–I
 
 Not started.

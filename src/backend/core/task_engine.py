@@ -32,6 +32,7 @@ TERMINAL_STATES = {"completed", "failed", "cancelled"}
 
 _lock = threading.RLock()
 _db_path_override: Path | None = None
+_running: set[str] = set()  # tasks executing in this process (guards against double clicks)
 
 
 def _db_path() -> Path:
@@ -64,6 +65,10 @@ def _connect():
             );
             """
         )
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+        for column in ("started", "finished"):  # added after the first release of tasks.db
+            if column not in columns:
+                conn.execute(f"ALTER TABLE tasks ADD COLUMN {column} TEXT DEFAULT ''")
         yield conn
         conn.commit()
     finally:
@@ -107,7 +112,10 @@ def create_task(goal: str, steps: list[dict]) -> dict:
         clean.append((name, args))
     task_id = uuid.uuid4().hex[:8]
     with _lock, _connect() as conn:
-        conn.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?)", (task_id, goal, "pending", _now(), _now(), ""))
+        conn.execute(
+            "INSERT INTO tasks (id, goal, state, created, updated, error) VALUES (?,?,?,?,?,?)",
+            (task_id, goal, "pending", _now(), _now(), ""),
+        )
         for idx, (name, args) in enumerate(clean):
             conn.execute(
                 "INSERT INTO steps (task_id, idx, tool, args, state, needs_approval) VALUES (?,?,?,?,?,?)",
@@ -124,6 +132,7 @@ def get_task(task_id: str) -> dict | None:
         steps = conn.execute("SELECT * FROM steps WHERE task_id=? ORDER BY idx", (task_id,)).fetchall()
     task = dict(row)
     task["steps"] = [{**dict(s), "args": json.loads(s["args"])} for s in steps]
+    task["active"] = task_id in _running
     return task
 
 
@@ -134,8 +143,13 @@ def list_tasks(limit: int = 20) -> list[dict]:
 
 
 def _set_task(task_id: str, state: str, error: str = "") -> None:
+    now = _now()
     with _lock, _connect() as conn:
-        conn.execute("UPDATE tasks SET state=?, updated=?, error=? WHERE id=?", (state, _now(), error[:300], task_id))
+        conn.execute("UPDATE tasks SET state=?, updated=?, error=? WHERE id=?", (state, now, error[:300], task_id))
+        if state == "running":
+            conn.execute("UPDATE tasks SET started=? WHERE id=? AND (started IS NULL OR started='')", (now, task_id))
+        if state in TERMINAL_STATES:
+            conn.execute("UPDATE tasks SET finished=? WHERE id=?", (now, task_id))
 
 
 def _set_step(task_id: str, idx: int, **fields) -> None:
@@ -172,6 +186,23 @@ def approve_step(task_id: str) -> dict | None:
     return get_task(task_id)
 
 
+def reject_step(task_id: str) -> dict | None:
+    """Refuse the step waiting for approval: it never runs and the task stops."""
+    task = get_task(task_id)
+    if not task or task["state"] != "approval_required":
+        return task
+    for step in task["steps"]:
+        if step["state"] == "approval_required":
+            _set_step(task_id, step["idx"], state="rejected", error="rejected by user")
+            _set_task(task_id, "cancelled", f"step {step['idx'] + 1} ({step['tool']}) rejected by user")
+            break
+    return get_task(task_id)
+
+
+def can_resume(task: dict) -> bool:
+    return task["state"] in {"pending", "interrupted"} and not task.get("active")
+
+
 # ── Execution ─────────────────────────────────────────────────────
 def _invoke_with_timeout(tool, args: dict, timeout: float) -> str:
     box: dict = {}
@@ -194,6 +225,18 @@ def _invoke_with_timeout(tool, args: dict, timeout: float) -> str:
 
 def run_task(task_id: str, *, profile_id: str = "admin", sleep=time.sleep) -> dict:
     """Run pending steps in order until done, blocked, cancelled or failed."""
+    with _lock:
+        if task_id in _running:
+            return get_task(task_id)  # already executing: a second click must not run steps twice
+        _running.add(task_id)
+    try:
+        return _run_task(task_id, profile_id, sleep)
+    finally:
+        with _lock:
+            _running.discard(task_id)
+
+
+def _run_task(task_id: str, profile_id: str, sleep) -> dict:
     from services import security_manager
 
     from core.security import emergency_stop

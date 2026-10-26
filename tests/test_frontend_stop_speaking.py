@@ -82,6 +82,7 @@ started.length = 0; pending.length = 0;
 speakSentenceChain(['new'], 0, () => started.push('DONE'));
 pending.shift()();
 assert(JSON.stringify(started) === '["new","DONE"]', 'new reply plays after stop');
+assert(button.hidden, 'button hidden once the queue finishes on its own');
 
 // 4. Gemini Live playback is interrupted too.
 liveVoiceClient = {{ player: {{ isPlaying: true }}, handleLocalBargeIn() {{ bargeIns.push(1); this.player.isPlaying = false; }} }};

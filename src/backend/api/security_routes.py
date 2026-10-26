@@ -181,20 +181,37 @@ async def list_persistent_tasks():
 
 @security_bp.route("/api/security/tasks/<task_id>/<action>", methods=["POST"])
 async def task_action(task_id: str, action: str):
-    """approve (control-panel confirmation), resume or cancel a persistent task."""
+    """Control-panel actions. approve/resume start the task in the background and return at once;
+    poll GET /api/security/tasks for progress. Only eligible actions are accepted (409 otherwise)."""
     from core import task_engine
 
-    if action not in {"approve", "resume", "cancel"}:
+    if action not in {"approve", "reject", "resume", "cancel"}:
         return jsonify({"error": "Unknown action."}), 400
-    if task_engine.get_task(task_id) is None:
+    task = await asyncio.to_thread(task_engine.get_task, task_id)
+    if task is None:
         return jsonify({"error": "No such task."}), 404
     if action == "cancel":
+        if task["state"] in task_engine.TERMINAL_STATES:
+            return jsonify({"error": f"Task is already {task['state']}.", "task": task}), 409
         task = await asyncio.to_thread(task_engine.cancel_task, task_id)
-    else:
-        if action == "approve":
-            await asyncio.to_thread(task_engine.approve_step, task_id)
-        task = await asyncio.to_thread(task_engine.run_task, task_id)
-    return jsonify({"task": task, "summary": task_engine.summarize(task)})
+        return jsonify({"task": task, "summary": task_engine.summarize(task)})
+    if action in {"approve", "reject"} and task["state"] != "approval_required":
+        return jsonify({"error": "Nothing is waiting for approval.", "task": task}), 409
+    if action == "reject":
+        task = await asyncio.to_thread(task_engine.reject_step, task_id)
+        return jsonify({"task": task, "summary": task_engine.summarize(task)})
+    if action == "resume" and not task_engine.can_resume(task):
+        return jsonify({"error": f"Task is {task['state']}{' and already running' if task.get('active') else ''}; it cannot be resumed.", "task": task}), 409
+    from core.security import emergency_stop
+
+    if emergency_stop.is_engaged():
+        return jsonify({"error": "Emergency stop is active.", "task": task}), 409
+    if action == "approve":
+        await asyncio.to_thread(task_engine.approve_step, task_id)
+    _background_tasks.add(asyncio.create_task(asyncio.to_thread(task_engine.run_task, task_id)))
+    await asyncio.sleep(0)
+    task = await asyncio.to_thread(task_engine.get_task, task_id)
+    return jsonify({"task": task, "summary": task_engine.summarize(task)}), 202
 
 
 @security_bp.route("/api/security/reminders", methods=["GET"])
@@ -285,6 +302,14 @@ async def wakeword():
     except ValueError:
         since = 0
     return jsonify(wake_word_listener.status(since))
+
+
+@security_bp.route("/api/security/diagnostics", methods=["GET"])
+async def system_diagnostics():
+    """Live readings for the control panel; unavailable values are null, never 0."""
+    from core import diagnostics
+
+    return jsonify(await asyncio.to_thread(diagnostics.collect))
 
 
 @security_bp.route("/api/security/microphones", methods=["GET", "POST"])

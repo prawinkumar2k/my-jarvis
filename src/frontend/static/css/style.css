@@ -2372,3 +2372,23 @@ body::before {
     color: rgba(180, 205, 220, 0.65);
     font-size: 10px;
 }
+
+
+/* Persistent task control panel */
+.task-list { max-height: 260px; overflow-y: auto; font-size: 0.68rem; }
+.task-card { border-left: 2px solid var(--primary); padding: 4px 0 4px 8px; margin-bottom: 6px; }
+.task-card.task-approval_required, .task-card.task-interrupted { border-left-color: var(--processing); }
+.task-card.task-failed, .task-card.task-cancelled { border-left-color: var(--warning); }
+.task-summary { display: flex; gap: 6px; cursor: pointer; align-items: baseline; }
+.task-state { font-weight: 700; white-space: nowrap; }
+.task-goal { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.task-meta, .task-approval, .task-error { margin-top: 3px; overflow-wrap: anywhere; }
+.task-approval { color: var(--processing); }
+.task-error { color: var(--warning); }
+.task-steps { margin: 4px 0 0 16px; padding: 0; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.task-btn { padding: 2px 8px; font-size: 0.65rem; }
+.task-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* Microphone selector: device names can be very long; keep the header on one line (full name in the tooltip). */
+#mic-selector { flex: 0 1 170px; max-width: 170px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }

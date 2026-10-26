@@ -15,6 +15,7 @@ import {
 } from './modules/voice-capabilities.js';
 import { classifyVoiceApiFailure } from './modules/voice-api.js';
 import { audioConstraints, setPreferredMicName } from './modules/mic-preference.js';
+import { renderTasks } from './modules/task-panel.js';
 import {
     LiveVoiceClient,
     liveVoiceErrorView,
@@ -2287,6 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalizeChain = () => {
             if (chainToken !== ttsChainToken) return;
             ttsChainActive = false;
+            renderStopSpeaking();
             wakeWordCooldownUntil = Math.max(wakeWordCooldownUntil, Date.now() + 1800);
             callback?.();
         };
@@ -2799,6 +2801,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('mic-selector')?.addEventListener('change', chooseMicrophone);
+
+    // Persistent task panel: real state from /api/security/tasks, refreshed every few seconds.
+    const taskBusy = new Set();
+    let lastTasks = [];
+
+    function showTasks(tasks) {
+        lastTasks = Array.isArray(tasks) ? tasks : [];
+        const count = document.getElementById('task-count');
+        if (count) count.textContent = String(lastTasks.filter((task) => !['completed', 'failed', 'cancelled'].includes(task.state)).length);
+        renderTasks(document.getElementById('task-panel'), lastTasks, { t, busy: taskBusy, onAction: runTaskAction });
+    }
+
+    async function refreshTasks() {
+        if (document.hidden) return;
+        try {
+            const res = await fetch('/api/security/tasks');
+            if (res.ok) showTasks((await res.json()).tasks);
+        } catch (_) { /* backend restarting: keep the last view */ }
+    }
+
+    async function runTaskAction(taskId, action) {
+        if (taskBusy.has(taskId)) return;  // ignore repeated clicks while a request is in flight
+        taskBusy.add(taskId);
+        showTasks(lastTasks);
+        try {
+            const res = await fetch(`/api/security/tasks/${encodeURIComponent(taskId)}/${action}`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            ui.addLogEntry(`> TASK ${taskId} ${action}: ${res.ok ? (data.task?.state || 'ok') : (data.error || `HTTP ${res.status}`)}`);
+        } catch (err) {
+            ui.addLogEntry(`> TASK ${taskId} ${action}: ${err.message}`);
+        } finally {
+            taskBusy.delete(taskId);
+            await refreshTasks();
+        }
+    }
+
+    refreshTasks();
+    setInterval(refreshTasks, 4000);
     fetchJsonWithRetry('/api/security/microphones').then(renderMicrophones).catch(() => { });
     // Sync with the backend: the listener may already be on (enabled earlier or by script).
     fetchJsonWithRetry('/api/security/wakeword')

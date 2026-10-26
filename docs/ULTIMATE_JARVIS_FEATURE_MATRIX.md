@@ -27,7 +27,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Offline speech-to-text (faster-whisper `small`, CPU int8) | VERIFIED | Network blocked: English WAV, WebM/Opus, OGG/Opus transcribed exactly; 2.6–7 s each |
 | FFmpeg audio conversion | VERIFIED | `Gyan.FFmpeg` 9.0.2 via winget (user scope) |
 | Microphone selection, unplugged fallback, reconnect | PARTIAL | Real mic listed/selected/reopened; physical unplug not tested (built-in mic only) |
-| Stop speaking (Esc / STOP VOICE) | VERIFIED (unit) | Node test on real `main.js` code; stops queue and Live playback |
+| Stop speaking (Esc / STOP VOICE) | VERIFIED | Real browser: Esc stopped the spoken briefing; button hides after speech |
 | Tamil / Thanglish transcription accuracy | BLOCKED | Needs real recordings; harness `scripts/evaluate_stt.py` ready |
 | Offline "Hey Jarvis" wake word | UNVERIFIED | Engine + real mic verified; your own voice not yet confirmed |
 | Gemini Live two-way voice, interruption | UNVERIFIED | Used by voice button and wake word; natural voice |
@@ -42,12 +42,13 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | --- | --- | --- |
 | Open apps, close/focus windows | VERIFIED | Notepad, WhatsApp, PowerPoint seen in logs |
 | Window layouts (split / grid) | VERIFIED | Two Notepads placed at exact half screens |
+| Move window to a screen / focus layout | VERIFIED (1 screen) | Exact rects on the real display; multi-monitor geometry unit-tested only |
 | Volume, mute/unmute (exact via pycaw) | VERIFIED | |
 | Media keys for any player | UNVERIFIED | Not pressed during tests to avoid pausing your music |
 | Brightness | VERIFIED | Read and set on the built-in screen |
 | Screenshot | VERIFIED | Saved to Pictures\JARVIS Screenshots |
 | Screen analysis (vision) | UNVERIFIED | Enabled; uses Gemini |
-| Clipboard read/write, secrets withheld | VERIFIED | |
+| Clipboard read/write/clear, secrets withheld, yes before reading | VERIFIED (unit) | Reading may send text to the cloud AI, so it asks first |
 | Lock / shutdown / restart with confirmation | existing | `controlar_pc` |
 | Windows Settings pages | UNVERIFIED | |
 | Wi-Fi / Bluetooth on/off | MISSING | Needs admin rights; opens Settings instead |
@@ -60,6 +61,10 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | List / search / create / copy / move / rename / organize | VERIFIED | Allowed folders only |
 | Delete to Recycle Bin with confirmation | PARTIAL | Recycle Bin path not exercised by tests |
 | Duplicate finder (SHA-256), large files | VERIFIED | |
+| File details (size, dates, read-only, link) | VERIFIED (unit) | Allowed folders only |
+| Install software with winget (approval, user scope) | PARTIAL | Real search and identity check; real install path stopped as already installed; installs unit-tested only |
+| Full diagnostics (GPU, disk health, battery time) | VERIFIED | Real readings; unavailable shown as unavailable |
+| Browser click/type need approval | VERIFIED (unit) | Playwright Chromium not downloaded (BLOCKED on approval) |
 | PDF / spreadsheet understanding | MISSING | |
 
 ## Companion, memory, reminders
@@ -82,7 +87,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Emergency STOP (tools, live voice, playback, wake word) | VERIFIED | |
 | Tool risk levels, confirmation, path confinement, audit | VERIFIED | |
 | API key in Windows Credential Manager | MISSING | Key is in `.env` (git-ignored) |
-| Persistent multi-step tasks resumed after restart | VERIFIED (unit) | SQLite checkpoints, bounded retries, approval gate, cancel, emergency stop; `/api/security/tasks`. No UI panel yet |
+| Persistent multi-step tasks resumed after restart | VERIFIED | Unit tests + real UI run: resume, approval pause, approve, done 3/3 |
+| Task control panel (approve / reject / resume / cancel) | VERIFIED | Real Edge + backend end-to-end; backend re-checks eligibility |
 
 ## Integrations
 

@@ -124,3 +124,98 @@ def test_validation_rejects_unknown_tools_and_too_many_steps(engine):
         task_engine.create_task("x", [{"tool": "rm_rf", "args": {}}])
     with pytest.raises(ValueError):
         task_engine.create_task("x", [{"tool": "open_app", "args": {}}] * 13)
+
+
+def test_reject_stops_the_task_without_running_the_risky_step(engine):
+    fakes, _ = engine
+    task = task_engine.create_task("x", [{"tool": "delete_file", "args": {}}, {"tool": "open_app", "args": {}}])
+    _run(task["id"])
+    rejected = task_engine.reject_step(task["id"])
+    assert rejected["state"] == "cancelled" and "rejected" in rejected["error"]
+    assert rejected["steps"][0]["state"] == "rejected"
+    assert _run(task["id"])["state"] == "cancelled"
+    assert fakes["delete_file"].calls == 0 and fakes["open_app"].calls == 0
+
+
+def test_a_second_run_while_running_does_not_repeat_steps(engine, monkeypatch):
+    import threading
+
+    fakes, _ = engine
+    gate, entered = threading.Event(), threading.Event()
+    slow = FakeTool("open_app")
+
+    def invoke(args):
+        entered.set()
+        gate.wait(5)
+        return FakeTool.invoke(slow, args)
+
+    slow.invoke = invoke
+    fakes["open_app"] = slow
+    task = task_engine.create_task("x", [{"tool": "open_app", "args": {}}])
+    worker = threading.Thread(target=_run, args=(task["id"],))
+    worker.start()
+    assert entered.wait(5)
+    second = _run(task["id"])  # double click while the first run is busy
+    assert second["active"] is True and second["state"] == "running"
+    gate.set()
+    worker.join(5)
+    assert slow.calls == 1
+    done = task_engine.get_task(task["id"])
+    assert done["state"] == "completed" and done["active"] is False
+    assert done["started"] and done["finished"]
+
+
+def test_old_database_without_timestamp_columns_is_upgraded(engine, tmp_path):
+    import sqlite3
+
+    db = tmp_path / "old.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, goal TEXT NOT NULL, state TEXT NOT NULL,"
+                     " created TEXT NOT NULL, updated TEXT NOT NULL, error TEXT DEFAULT '')")
+        conn.execute("INSERT INTO tasks VALUES ('old1', 'legacy', 'interrupted', 'c', 'u', '')")
+    task_engine._db_path_override = db
+    legacy = task_engine.get_task("old1")
+    assert legacy["state"] == "interrupted" and legacy["started"] == "" and legacy["steps"] == []
+
+
+def test_task_routes_enforce_eligibility_and_origin(engine, monkeypatch):
+    import asyncio
+
+    import jarvis_backend
+
+    monkeypatch.setenv("JARVIS_TEST_MODE", "1")
+    fakes, _ = engine
+    risky = task_engine.create_task("cleanup", [{"tool": "delete_file", "args": {}}])
+    _run(risky["id"])
+    done = task_engine.create_task("done", [{"tool": "open_app", "args": {}}])
+    _run(done["id"])
+
+    async def call():
+        client = jarvis_backend.app.test_client()
+        h = {"Origin": "http://localhost:5002"}
+        out = {}
+        out["list"] = await (await client.get("/api/security/tasks", headers=h)).get_json()
+        out["hostile"] = (await client.post(f"/api/security/tasks/{risky['id']}/approve", headers={"Origin": "https://evil.example"})).status_code
+        out["bad"] = (await client.post(f"/api/security/tasks/{risky['id']}/explode", headers=h)).status_code
+        out["missing"] = (await client.post("/api/security/tasks/nope/cancel", headers=h)).status_code
+        out["resume_waiting"] = (await client.post(f"/api/security/tasks/{risky['id']}/resume", headers=h)).status_code
+        out["approve_done"] = (await client.post(f"/api/security/tasks/{done['id']}/approve", headers=h)).status_code
+        out["cancel_done"] = (await client.post(f"/api/security/tasks/{done['id']}/cancel", headers=h)).status_code
+        approve = await client.post(f"/api/security/tasks/{risky['id']}/approve", headers=h)
+        out["approve"] = approve.status_code
+        for _ in range(50):
+            if task_engine.get_task(risky["id"])["state"] == "completed":
+                break
+            await asyncio.sleep(0.05)
+        out["approve_again"] = (await client.post(f"/api/security/tasks/{risky['id']}/approve", headers=h)).status_code
+        return out
+
+    out = asyncio.run(call())
+    assert {t["id"] for t in out["list"]["tasks"]} >= {risky["id"], done["id"]}
+    assert out["hostile"] == 403 and out["bad"] == 400 and out["missing"] == 404
+    assert out["resume_waiting"] == 409  # resume never bypasses an approval
+    assert out["approve_done"] == 409 and out["cancel_done"] == 409
+    assert out["approve"] == 202
+    assert task_engine.get_task(risky["id"])["state"] == "completed"
+    assert fakes["delete_file"].calls == 1
+    assert out["approve_again"] == 409  # a repeated click cannot run it twice

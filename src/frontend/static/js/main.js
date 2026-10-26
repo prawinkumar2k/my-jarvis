@@ -375,6 +375,26 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.loader.style.cursor = "pointer";
     }
 
+    // Startup status report (time, date, battery, CPU, memory) from live system data.
+    async function speakBootBriefing(fallbackText, onDone) {
+        let text = fallbackText;
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(`/api/security/startup-briefing?lang=${encodeURIComponent(currentLang)}`, {
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            clearTimeout(timer);
+            const data = res.ok ? await res.json() : null;
+            if (data?.text) text = data.text;
+        } catch (_) {
+            // Keep the short greeting if the status report is unavailable.
+        }
+        if (text !== fallbackText) ui.addConversationSegment('jarvis', text);
+        speak(text, onDone);
+    }
+
     let bootStarted = false;
     // The desktop app (WebView2, autoplay allowed by start_app.py) boots by itself.
     if (dom.loader && navigator.userAgent.includes('DesktopJarvis')) {
@@ -395,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     dom.loader.classList.add('hidden');
                     dom.app.classList.remove('hidden');
                     const greetings = t('boot_greetings');
-                    speak(
+                    speakBootBriefing(
                         greetings[Math.floor(Math.random() * greetings.length)],
                         () => {
                             loadNewsBackground();

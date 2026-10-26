@@ -161,6 +161,16 @@ async def private_mode():
     return jsonify({"private_mode": is_private_mode()})
 
 
+@security_bp.route("/api/security/startup-briefing", methods=["GET"])
+async def startup_briefing():
+    """Short spoken status report for app start: time, date, battery, CPU, memory."""
+    from core.startup_briefing import build_briefing, collect_status
+    from utils.jarvis_i18n import get_current_language
+
+    status = await asyncio.to_thread(collect_status)
+    return jsonify({"text": build_briefing(request.args.get("lang") or get_current_language(), status)})
+
+
 @security_bp.route("/api/security/reminders", methods=["GET"])
 async def reminders_status():
     """Pending reminders plus any that are due now (each due reminder is returned once)."""

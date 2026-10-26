@@ -158,13 +158,51 @@ def _internet_ok() -> bool:
         return False
 
 
+def ping_ai(timeout: float = 15.0) -> dict:
+    """One tiny request to the active AI model: ok, model, latency_ms, problem."""
+    import time
+
+    from core.brain import brain_state
+    from core.errors import LLM_FAILURE_MESSAGES, classify_llm_failure
+
+    model = brain_state.llm
+    if model is None:
+        return {"ok": False, "model": "", "latency_ms": None, "problem": "not_configured"}
+    name = str(getattr(model, "model_name", "") or getattr(model, "model", "") or "")
+    outcome: dict = {}
+
+    def call():
+        start = time.monotonic()
+        try:
+            from langchain_core.messages import HumanMessage
+
+            model.invoke([HumanMessage(content="Reply with the single word OK.")])
+            outcome["latency_ms"] = int((time.monotonic() - start) * 1000)
+        except Exception as exc:
+            outcome["problem"] = classify_llm_failure(exc)
+
+    worker = threading.Thread(target=call, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        outcome["problem"] = "timeout"
+    problem = outcome.get("problem")
+    return {
+        "ok": problem is None,
+        "model": name,
+        "latency_ms": outcome.get("latency_ms"),
+        "problem": problem,
+        "message": LLM_FAILURE_MESSAGES.get(problem or "", "") if problem else "",
+    }
+
+
 def collect_health() -> dict:
     checks: dict[str, tuple[bool, str]] = {}
     checks["internet"] = (ok := _internet_ok(), "online" if ok else "offline")
     try:
-        from core.brain import brain_state
-
-        checks["ai"] = (brain_state.llm is not None, "ready" if brain_state.llm is not None else "not configured")
+        ai = ping_ai()
+        detail = f"{ai['model']} answered in {ai['latency_ms']} ms" if ai["ok"] else (ai["problem"] or "unavailable")
+        checks["ai"] = (ai["ok"], detail)
     except Exception:
         checks["ai"] = (False, "unavailable")
     try:

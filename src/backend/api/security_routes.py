@@ -181,9 +181,36 @@ async def reminders_status():
     return jsonify({"pending": reminder_store.pending(), "due": due})
 
 
+async def _reminder_notification_loop(interval: float = 10.0) -> None:
+    """Fire due reminders and show a Windows notification for each (window may be minimized)."""
+    from core.notifications import show_toast
+    from core.reminders import reminder_store
+
+    while True:
+        try:
+            for item in await asyncio.to_thread(reminder_store.fire_due):
+                prefix = "Missed while JARVIS was closed: " if item.get("missed") else ""
+                await asyncio.to_thread(show_toast, "JARVIS reminder", prefix + item["text"])
+        except Exception as exc:
+            print(f"[WARN reminders] notification loop: {type(exc).__name__}")
+        await asyncio.sleep(interval)
+
+
+@security_bp.before_app_serving
+async def _start_reminder_notifications():
+    import os
+
+    if os.getenv("JARVIS_TEST_MODE") != "1":
+        _background_tasks.add(asyncio.create_task(_reminder_notification_loop()))
+
+
 @security_bp.before_app_serving
 async def _restore_wake_word():
     """Turn "Hey Jarvis" back on at startup if the user left it on."""
+    import os
+
+    if os.getenv("JARVIS_TEST_MODE") == "1":
+        return  # never open the real microphone during tests
     try:
         from voice.wake_word import remembered_enabled, wake_word_listener
 
@@ -222,6 +249,14 @@ async def wakeword():
     except ValueError:
         since = 0
     return jsonify(wake_word_listener.status(since))
+
+
+@security_bp.route("/api/security/ai-test", methods=["POST"])
+async def ai_connection_test():
+    """Send one tiny request to the configured AI model and report model, latency or the problem."""
+    from tools.assistant_tools import ping_ai
+
+    return jsonify(await asyncio.to_thread(ping_ai))
 
 
 @security_bp.route("/api/security/startup", methods=["GET"])

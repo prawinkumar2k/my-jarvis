@@ -6,6 +6,7 @@ from core import jarvis_brain
 from core.errors import (
     CHAT_UNAVAILABLE_MESSAGE,
     LLM_UNCONFIGURED_MESSAGE,
+    LLMServiceError,
     LLMUnavailableError,
 )
 from core.jarvis_observability import obs_event
@@ -151,6 +152,8 @@ async def api_chat():
             error=type(exc).__name__,
             ip=request.remote_addr or "unknown",
         )
+        if isinstance(exc, LLMServiceError) and exc.kind != "unavailable":
+            return jsonify({"error": exc.public_code, "message": exc.public_message}), 503
         return _chat_unavailable_response()
 
 
@@ -206,7 +209,10 @@ async def api_chat_stream():
                 error=type(exc).__name__,
                 ip=ip,
             )
-            yield _sse_error("chat_unavailable", CHAT_UNAVAILABLE_MESSAGE)
+            if isinstance(exc, LLMServiceError) and exc.kind != "unavailable":
+                yield _sse_error(exc.public_code, exc.public_message)
+            else:
+                yield _sse_error("chat_unavailable", CHAT_UNAVAILABLE_MESSAGE)
 
     return Response(
         generate(),

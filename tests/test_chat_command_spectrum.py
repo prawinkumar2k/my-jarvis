@@ -39,6 +39,11 @@ class _SyncClient:
 
 @pytest.fixture
 def sync_client():
+    from api import chat_routes
+
+    # Restore the module-level rate-limit config afterwards: init_chat_routes
+    # mutates globals that the real backend app shares with later tests.
+    saved = (chat_routes._ip_last_call, chat_routes._ip_last_call_lock, chat_routes.chat_limit_seconds)
     app = Quart(__name__)
     app.config["TESTING"] = True
     init_chat_routes(
@@ -49,7 +54,8 @@ def sync_client():
         )
     )
     app.register_blueprint(chat_bp)
-    return _SyncClient(app.test_client())
+    yield _SyncClient(app.test_client())
+    chat_routes._ip_last_call, chat_routes._ip_last_call_lock, chat_routes.chat_limit_seconds = saved
 
 
 def test_chat_general_conversation_spanish(sync_client, monkeypatch):

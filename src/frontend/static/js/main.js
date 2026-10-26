@@ -2099,7 +2099,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // A missing AI key is a setup problem, not a crash: say exactly what to do.
     function reasoningFailureReply(err) {
         const detail = String(err?.message || '');
-        if (detail === 'llm_unconfigured' || detail.includes('GEMINI_API_KEY')) return t('cog_unconfigured_msg');
+        if (detail === 'llm_unconfigured' || detail.includes('Configure GEMINI_API_KEY')) return t('cog_unconfigured_msg');
+        if (detail === 'llm_rate_limited' || detail.includes('usage limit')) return t('cog_rate_limited_msg');
+        if (detail === 'llm_auth_failed' || detail.includes('rejected the API key')) return t('cog_auth_failed_msg');
+        if (detail === 'llm_timeout' || detail === 'llm_network') return t('cog_network_msg');
         return t('cog_fail_msg');
     }
 

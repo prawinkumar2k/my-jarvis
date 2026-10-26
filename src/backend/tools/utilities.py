@@ -313,8 +313,12 @@ def _format_weather_temperature(temp: str, lang: str) -> str:
     temp_value = _temperature_to_float(temp)
     if temp_value is None:
         return ""
+    if os.getenv("JARVIS_TEMPERATURE_UNIT", "celsius").strip().lower().startswith("f"):
+        if not str(lang or "").lower().startswith("es"):
+            return f"{round((temp_value * 9.0 / 5.0) + 32.0)} degrees Fahrenheit"
+        return f"{round((temp_value * 9.0 / 5.0) + 32.0)} grados Fahrenheit"
     if not str(lang or "").lower().startswith("es"):
-        return f"{round((temp_value * 9.0 / 5.0) + 32.0)} degrees Fahrenheit"
+        return f"{round(temp_value)} degrees Celsius"
     return f"{round(temp_value)} grados Celsius"
 
 
@@ -428,9 +432,10 @@ def _obtener_clima_logic(ciudad: str | None = None) -> tuple[str, str]:
 
 
 @tool
-def obtener_clima(ciudad: str = "Madrid") -> str:
-    """Obtiene el clima actual de una ciudad específica usando proveedores de red o Google."""
+def obtener_clima(ciudad: str = "") -> str:
+    """Current weather for a city. Leave ciudad empty to use the user's home location."""
     lang = get_current_language()
+    ciudad = str(ciudad or "").strip() or _get_default_location()
     desc, temp = _obtener_clima_logic(ciudad)
     temp_label = _format_weather_temperature(temp, lang)
     if not lang.startswith("es"):

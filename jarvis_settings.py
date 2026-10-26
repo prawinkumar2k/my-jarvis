@@ -5,9 +5,9 @@
 
 ASSISTANT_NAME = "J.A.R.V.I.S."
 ASSISTANT_FULLNAME = "Just A Rather Very Intelligent System"
-OWNER_TITLE = "Administrator"
+OWNER_TITLE = "Prawin"
 COMPANY_NAME = "YOUR_COMPANY"
-LOCATION = "Malibu, CA"
+LOCATION = "Chennai, Tamil Nadu, India"
 
 # Global Language Settings
 LANGUAGE = "en"  # "en", "ta" (Thanglish UI), "es"

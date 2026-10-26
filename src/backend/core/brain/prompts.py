@@ -108,7 +108,8 @@ def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMess
 
     if not resolve_runtime_features().allow_guest_mode:
         _pid_es_owner = True
-    _nombre_activo = bt["profile_administrator"] if _pid_es_owner else bt["profile_guest"]
+    owner_name = str(getattr(jarvis_settings, "OWNER_TITLE", "") or bt["profile_administrator"])
+    _nombre_activo = owner_name if _pid_es_owner else bt["profile_guest"]
     perfil_activo = f"{_nombre_activo} ({bt['profile_label']}: {_pid_activo})"
     try:
         _snap = get_auth_snapshot() or {}
@@ -116,9 +117,7 @@ def get_system_msg(user_input: str, profile_id: str | None = None) -> SystemMess
         if _snap_pid == pid:
             _pid_activo = _snap_pid
             _pid_es_owner = _pid_activo == jarvis_state.DEFAULT_PROFILE_ID
-            _nombre_activo = _snap.get("nombre") or (
-                bt["profile_administrator"] if _pid_es_owner else bt["profile_guest"]
-            )
+            _nombre_activo = _snap.get("nombre") or (owner_name if _pid_es_owner else bt["profile_guest"])
             perfil_activo = f"{_nombre_activo} ({bt['profile_label']}: {_pid_activo})"
     except Exception as exc:
         log_warning("auth_snapshot_read_failed", error=type(exc).__name__)

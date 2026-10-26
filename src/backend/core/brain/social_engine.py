@@ -95,6 +95,20 @@ _TECH_TOPIC_HINTS = {
 }
 
 
+
+
+def _with_owner_name(text: str) -> str:
+    """Use the configured owner name (jarvis_settings.OWNER_TITLE) instead of the generic title."""
+    try:
+        import jarvis_settings
+
+        owner = str(getattr(jarvis_settings, "OWNER_TITLE", "") or "").strip()
+    except ImportError:
+        owner = ""
+    if not owner or owner in {"Administrator", "Administrador"}:
+        return text
+    return text.replace("the Administrator", owner).replace("Administrator", owner).replace("Administrador", owner)
+
 def _normalizar_social_texto(text: str) -> str:
     import unicodedata
 
@@ -246,12 +260,12 @@ def _respuesta_rapida_social(user_input: str, profile_id: str = DEFAULT_PROFILE_
 
     if _contiene_frase(t_plain, bt["social_hi"]):
         if str(profile_id or "").strip().lower() == DEFAULT_PROFILE_ID:
-            return bt["social_online_admin"]
+            return _with_owner_name(bt["social_online_admin"])
         return bt["social_online_guest"].format(name=nombre_activo)
 
     if _contiene_frase(t_plain, bt["social_how"]):
         if str(profile_id or "").strip().lower() == DEFAULT_PROFILE_ID:
-            return bt["social_status_admin"]
+            return _with_owner_name(bt["social_status_admin"])
         return bt["social_status_guest"].format(name=nombre_activo)
 
     if _contiene_frase(t_plain, bt.get("social_assistant_who", [])):
@@ -259,12 +273,12 @@ def _respuesta_rapida_social(user_input: str, profile_id: str = DEFAULT_PROFILE_
 
     if _contiene_frase(t_plain, bt["social_who"]):
         if str(profile_id or "").strip().lower() == DEFAULT_PROFILE_ID:
-            return bt["social_identity_admin"]
+            return _with_owner_name(bt["social_identity_admin"])
         return bt["social_identity_guest"].format(name=nombre_activo)
 
     if _contiene_frase(t_plain, bt["social_thanks"]):
         if str(profile_id or "").strip().lower() == DEFAULT_PROFILE_ID:
-            return bt["social_thanks_admin"]
+            return _with_owner_name(bt["social_thanks_admin"])
         return bt["social_thanks_guest"].format(name=nombre_activo)
 
     if _contiene_frase(t_plain, bt["social_stop"]):

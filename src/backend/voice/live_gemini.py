@@ -84,7 +84,12 @@ class GeminiLiveStreamer:
         """Resolve the display name for the current active profile."""
         pid = str(self.session.profile_id or "default").strip()
         if pid in {"default", "admin", "owner"}:
-            return "Administrador"
+            try:
+                import jarvis_settings
+
+                return str(getattr(jarvis_settings, "OWNER_TITLE", "") or "Administrator")
+            except ImportError:
+                return "Administrator"
         try:
             import sqlite3
 

@@ -1,3 +1,5 @@
+import { audioConstraints } from './mic-preference.js';
+
 /** Deterministic microphone resampling and bounded PCM capture for Live voice. */
 
 export function resampleMono(samples, sourceRate, targetRate = 16000) {
@@ -156,14 +158,12 @@ export class LivePcmCapture {
         if (!mediaDevices?.getUserMedia) {
             throw new Error('live_audio_capture_unsupported');
         }
-        this.mediaStream = await mediaDevices.getUserMedia({
-            audio: {
-                channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-            }
-        });
+        this.mediaStream = await mediaDevices.getUserMedia(await audioConstraints({
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+        }));
         this.sourceNode = context.createMediaStreamSource(this.mediaStream);
         this.chunker = new LivePcmChunker({
             sourceRate: context.sampleRate,

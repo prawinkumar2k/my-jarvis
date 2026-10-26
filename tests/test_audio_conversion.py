@@ -46,6 +46,8 @@ def test_convert_to_wav_uses_hardened_ffmpeg_command_and_cleans_tempdir(
         return _completed()
 
     monkeypatch.setattr(audio_conversion.subprocess, "run", fake_run)
+    # The executable path depends on the machine; flags are what this test checks.
+    monkeypatch.setattr(audio_conversion, "ffmpeg_executable", lambda: "ffmpeg")
 
     result = convert_to_wav(b"OggS" + b"input", runtime_dir=tmp_path)
 

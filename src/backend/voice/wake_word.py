@@ -21,6 +21,8 @@ SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80 ms, the frame size openWakeWord expects
 MODEL_NAME = "hey_jarvis"
 MODEL_FILE = "hey_jarvis_v0.1.onnx"
+MAX_RECONNECTS = 5  # bounded retries after a microphone error
+STABLE_SECONDS = 30.0  # a stream that ran this long resets the retry budget
 
 
 def _float_env(name: str, default: float, low: float, high: float) -> float:
@@ -52,6 +54,9 @@ class WakeWordListener:
         self._events: deque[WakeEvent] = deque(maxlen=20)
         self._next_id = 1
         self.error = ""
+        self.state = "stopped"  # stopped | listening | reconnecting | failed
+        self.device_name = ""
+        self.reconnects = 0
         self.threshold = _float_env("JARVIS_WAKE_WORD_THRESHOLD", 0.5, 0.1, 0.95)
         self.cooldown = _float_env("JARVIS_WAKE_WORD_COOLDOWN", 2.0, 0.5, 10.0)
 
@@ -72,6 +77,7 @@ class WakeWordListener:
                 log_warning("wake_word_start_failed", error=type(exc).__name__)
                 return False, self.error
             self.error = ""
+            self.state = "stopped"
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, args=(model,), name="jarvis-wake-word", daemon=True)
             self._thread.start()
@@ -84,6 +90,14 @@ class WakeWordListener:
         if thread and thread is not threading.current_thread():
             thread.join(timeout=3)
         self._thread = None
+        self.state = "stopped"
+
+    def restart(self) -> tuple[bool, str]:
+        """Reopen the microphone (after the user picks a different one)."""
+        if not self.running:
+            return True, "not listening"
+        self.stop()
+        return self.start()
 
     # ── detection ─────────────────────────────────────────
     def _load_model(self):
@@ -118,17 +132,37 @@ class WakeWordListener:
         model.reset()  # avoid re-triggering on the tail of the same phrase
         return event
 
-    def _run(self, model) -> None:
+    def _open_stream(self, device):
         import sounddevice as sd
 
-        try:
-            with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", blocksize=FRAME_SAMPLES) as stream:
-                while not self._stop.is_set():
-                    frames, _overflow = stream.read(FRAME_SAMPLES)
-                    self.process_frame(model, frames[:, 0])
-        except Exception as exc:
-            self.error = self._explain(exc)
-            log_warning("wake_word_stream_failed", error=type(exc).__name__)
+        return sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1, dtype="int16", blocksize=FRAME_SAMPLES)
+
+    def _run(self, model, clock=time.monotonic) -> None:
+        """One stream at a time; on a device error retry with backoff, at most MAX_RECONNECTS times in a row."""
+        from voice.microphones import resolve_device
+
+        self.reconnects = 0
+        while not self._stop.is_set():
+            try:
+                device, self.device_name, note = resolve_device()
+                with self._open_stream(device) as stream:
+                    opened = clock()
+                    self.state, self.error = "listening", note
+                    while not self._stop.is_set():
+                        frames, _overflow = stream.read(FRAME_SAMPLES)
+                        self.process_frame(model, frames[:, 0])
+                        if self.reconnects and clock() - opened > STABLE_SECONDS:
+                            self.reconnects = 0
+            except Exception as exc:
+                log_warning("wake_word_stream_failed", error=type(exc).__name__, attempt=self.reconnects + 1)
+                if self.reconnects >= MAX_RECONNECTS:
+                    self.state, self.error = "failed", self._explain(exc)
+                    return
+                self.reconnects += 1
+                self.state = "reconnecting"
+                self.error = f"Microphone problem; retrying ({self.reconnects}/{MAX_RECONNECTS})."
+                self._stop.wait(min(16.0, 2.0 ** (self.reconnects - 1)))
+        self.state = "stopped"
 
     @staticmethod
     def _explain(exc: Exception) -> str:
@@ -147,6 +181,9 @@ class WakeWordListener:
             "engine": "openwakeword",
             "phrase": "Hey Jarvis",
             "listening": self.running,
+            "state": ("starting" if self.state == "stopped" else self.state) if self.running else ("failed" if self.state == "failed" else "stopped"),
+            "device": self.device_name,
+            "reconnects": self.reconnects,
             "threshold": self.threshold,
             "cooldown_seconds": self.cooldown,
             "error": self.error,

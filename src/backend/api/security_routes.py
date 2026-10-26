@@ -287,6 +287,39 @@ async def wakeword():
     return jsonify(wake_word_listener.status(since))
 
 
+@security_bp.route("/api/security/microphones", methods=["GET", "POST"])
+async def microphones():
+    """List input devices and the saved choice; POST {"name": str|null} selects one (null = Windows default)."""
+    from voice import microphones as mics
+    from voice.wake_word import wake_word_listener
+
+    if request.method == "POST":
+        data = (await request.get_json(silent=True)) or {}
+        name = data.get("name")
+        if name is not None and not isinstance(name, str):
+            return jsonify({"error": "Field 'name' must be a string or null."}), 400
+        try:
+            ok, message = await asyncio.to_thread(mics.select, name)
+        except Exception as exc:
+            return jsonify({"error": f"Microphones unavailable ({type(exc).__name__})."}), 503
+        if not ok:
+            return jsonify({"error": message}), 409
+        await asyncio.to_thread(wake_word_listener.restart)
+    try:
+        devices = await asyncio.to_thread(mics.list_input_devices)
+        error = ""
+    except Exception as exc:
+        devices, error = [], f"Microphones unavailable ({type(exc).__name__})."
+    status = wake_word_listener.status()
+    return jsonify({
+        "devices": devices,
+        "selected": mics.selected_name(),
+        "in_use": status["device"],
+        "listener_state": status["state"],
+        "error": error or status["error"],
+    })
+
+
 @security_bp.route("/api/security/ai-test", methods=["POST"])
 async def ai_connection_test():
     """Send one tiny request to the configured AI model and report model, latency or the problem."""

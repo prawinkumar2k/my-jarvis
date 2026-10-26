@@ -14,6 +14,7 @@ import {
     detectVoiceCapabilities,
 } from './modules/voice-capabilities.js';
 import { classifyVoiceApiFailure } from './modules/voice-api.js';
+import { audioConstraints, setPreferredMicName } from './modules/mic-preference.js';
 import {
     LiveVoiceClient,
     liveVoiceErrorView,
@@ -274,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function interrumpirAudio() {
-        if (!isSpeaking && !currentAudio && !activeTtsController) return;
+        if (!isSpeaking && !currentAudio && !activeTtsController && !ttsChainActive) return;
         activeSpeakToken++;
         ttsChainActive = false;
         ttsChainToken++;
@@ -348,6 +349,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function animateWaves(active) {
         ui.animateWaves(active);
         if (reactor && reactor.setSpeaking) reactor.setSpeaking(active);
+        renderStopSpeaking();
+    }
+
+    function liveVoiceIsPlaying() {
+        return Boolean(liveVoiceClient?.player?.isPlaying);
+    }
+
+    function renderStopSpeaking() {
+        const btn = document.getElementById('stop-speaking');
+        if (btn) btn.hidden = !(isSpeaking || ttsChainActive || liveVoiceIsPlaying());
+    }
+
+    // One "stop talking" action for both voice paths: the local TTS queue and
+    // Gemini Live playback. The Live session itself stays open for the next request.
+    function stopSpeaking() {
+        interrumpirAudio();
+        if (liveVoiceIsPlaying()) liveVoiceClient.handleLocalBargeIn();
+        renderStopSpeaking();
     }
     function updateButtonUI(mode) { ui.updateButtonUI(mode, dom.activateBtn); }
     function getGlobalAudioContext() { return voice.getGlobalAudioContext(); }
@@ -656,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let stream;
         let rec;
         try {
-            stream = await navigator.mediaDevices.getUserMedia(AUDIO_CAPTURE_CONSTRAINTS);
+            stream = await navigator.mediaDevices.getUserMedia(await audioConstraints(AUDIO_CAPTURE_CONSTRAINTS.audio));
             rec = createMediaRecorder(stream);
         } catch { return null; }
 
@@ -1318,6 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         liveVoiceClient.onStateChange = (state) => {
+            renderStopSpeaking();
             if (state === 'speaking') clearLiveIdleTimer();
             else if (state === 'listening') armLiveIdleTimer();
             if (state === 'speaking') {
@@ -1942,7 +1962,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(AUDIO_CAPTURE_CONSTRAINTS);
+            const stream = await navigator.mediaDevices.getUserMedia(await audioConstraints(AUDIO_CAPTURE_CONSTRAINTS.audio));
             resetMicrophonePermissionBlock();
             activeAudioStream = stream;
             window._activeStartTime = Date.now();
@@ -2635,10 +2655,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && isSpeaking) {
-            interrumpirAudio();
+        if (e.key === 'Escape' && (isSpeaking || ttsChainActive || liveVoiceIsPlaying())) {
+            stopSpeaking();
         }
     });
+    document.getElementById('stop-speaking')?.addEventListener('click', stopSpeaking);
 
     // Emergency stop: blocks every tool on the backend and releases local audio.
     let emergencyStopEngaged = false;
@@ -2734,6 +2755,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('wakeword-toggle')?.addEventListener('click', toggleWakeword);
+
+    // Microphone selector (backend listener + browser capture use the same choice).
+    function renderMicrophones(data) {
+        const select = document.getElementById('mic-selector');
+        if (!select || !data) return;
+        const devices = Array.isArray(data.devices) ? data.devices : [];
+        select.replaceChildren();
+        const auto = document.createElement('option');
+        auto.value = '';
+        auto.textContent = t('mic_default');
+        select.appendChild(auto);
+        for (const device of devices) {
+            const option = document.createElement('option');
+            option.value = device.name;
+            option.textContent = device.label || device.name;
+            select.appendChild(option);
+        }
+        select.value = data.selected && devices.some((d) => d.name === data.selected) ? data.selected : '';
+        select.title = `${t('mic_label')}: ${data.in_use || select.selectedOptions[0]?.textContent || ''}${data.error ? ` — ${data.error}` : ''}`;
+        select.hidden = devices.length === 0;
+        setPreferredMicName(select.value);
+    }
+
+    async function chooseMicrophone(event) {
+        const select = event.target;
+        select.disabled = true;
+        try {
+            const res = await fetch('/api/security/microphones', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: select.value || null })
+            });
+            const data = await res.json();
+            if (!res.ok) ui.addLogEntry(`> MIC: ${data.error || `HTTP ${res.status}`}`);
+            else ui.addLogEntry(`> MIC: ${data.in_use || select.selectedOptions[0]?.textContent || ''}`);
+            renderMicrophones(data.devices ? data : await fetchJsonWithRetry('/api/security/microphones'));
+        } catch (err) {
+            ui.addLogEntry(`> MIC: ${err.message}`);
+        } finally {
+            select.disabled = false;
+        }
+    }
+
+    document.getElementById('mic-selector')?.addEventListener('change', chooseMicrophone);
+    fetchJsonWithRetry('/api/security/microphones').then(renderMicrophones).catch(() => { });
     // Sync with the backend: the listener may already be on (enabled earlier or by script).
     fetchJsonWithRetry('/api/security/wakeword')
         .then((data) => {

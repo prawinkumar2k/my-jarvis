@@ -54,6 +54,12 @@
                     <option value="ta">TA</option>
                     <option value="es">ES</option>
                 </select>
+                <button id="stop-speaking" class="tech-select autostart-toggle" type="button" hidden
+                    title="Stop speaking (Esc)" aria-keyshortcuts="Escape" data-i18n="stop_speaking">STOP VOICE</button>
+                <label class="sr-only" for="mic-selector" data-i18n="mic_label">Microphone</label>
+                <select id="mic-selector" class="tech-select" title="Microphone" hidden>
+                    <option value="" data-i18n="mic_default">Default mic</option>
+                </select>
                 <button id="wakeword-toggle" class="tech-select autostart-toggle" type="button" aria-pressed="false"
                     title="Offline wake word (local)" data-i18n="wakeword_off">HEY JARVIS: OFF</button>
                 <button id="autostart-toggle" class="tech-select autostart-toggle" type="button" aria-pressed="false"

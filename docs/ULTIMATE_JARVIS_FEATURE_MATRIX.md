@@ -24,7 +24,11 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Offline speech-to-text (faster-whisper `small`, CPU int8) | VERIFIED | Network blocked: 3/3 English sentences exact, 4–7 s each. Tamil not yet measured. FFmpeg not installed, so only WAV input works today |
+| Offline speech-to-text (faster-whisper `small`, CPU int8) | VERIFIED | Network blocked: English WAV, WebM/Opus, OGG/Opus transcribed exactly; 2.6–7 s each |
+| FFmpeg audio conversion | VERIFIED | `Gyan.FFmpeg` 9.0.2 via winget (user scope) |
+| Microphone selection, unplugged fallback, reconnect | PARTIAL | Real mic listed/selected/reopened; physical unplug not tested (built-in mic only) |
+| Stop speaking (Esc / STOP VOICE) | VERIFIED (unit) | Node test on real `main.js` code; stops queue and Live playback |
+| Tamil / Thanglish transcription accuracy | BLOCKED | Needs real recordings; harness `scripts/evaluate_stt.py` ready |
 | Offline "Hey Jarvis" wake word | UNVERIFIED | Engine + real mic verified; your own voice not yet confirmed |
 | Gemini Live two-way voice, interruption | UNVERIFIED | Used by voice button and wake word; natural voice |
 | Spoken replies | VERIFIED | Gemini voice when quota allows, otherwise local `ryan-high` |

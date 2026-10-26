@@ -59,3 +59,16 @@ def test_empty_or_undecodable_audio_raises_controlled_error(monkeypatch):
         decode_for_whisper(b"")
     with pytest.raises(AudioConversionError):
         decode_for_whisper(b"not audio at all")
+
+
+def test_ffmpeg_found_in_winget_folder_when_not_on_path(monkeypatch, tmp_path):
+    import shutil
+
+    exe = tmp_path / "Microsoft" / "WinGet" / "Packages" / "Gyan.FFmpeg_x" / "ffmpeg-9.0-full_build" / "bin" / "ffmpeg.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert audio_conversion.ffmpeg_executable() == str(exe)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "empty"))
+    assert audio_conversion.ffmpeg_executable() is None

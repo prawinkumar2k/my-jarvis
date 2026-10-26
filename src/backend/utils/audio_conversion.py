@@ -39,13 +39,30 @@ def _resolve_runtime_dir(runtime_dir: str | os.PathLike[str] | None) -> Path:
     return path
 
 
+def ffmpeg_executable() -> str | None:
+    """Locate FFmpeg on PATH, or in winget's per-user folders (PATH changes
+    made by winget only reach processes started after the install)."""
+    import shutil
+
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    local = os.getenv("LOCALAPPDATA")
+    if not local:
+        return None
+    winget = Path(local) / "Microsoft" / "WinGet"
+    candidates = [winget / "Links" / "ffmpeg.exe"]
+    candidates += sorted(winget.glob("Packages/*FFmpeg*/*/bin/ffmpeg.exe"), reverse=True)
+    return next((str(c) for c in candidates if c.is_file()), None)
+
+
 def _ffmpeg_commands(
     input_path: Path,
     output_path: Path,
     output_args: list[str],
 ) -> list[list[str]]:
     prefix = [
-        "ffmpeg",
+        ffmpeg_executable() or "ffmpeg",
         "-nostdin",
         "-hide_banner",
         "-loglevel",

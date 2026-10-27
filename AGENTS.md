@@ -166,6 +166,13 @@ asked is decided in `core/security/approval_policy.py` (AUTO / once per task or 
 Only a real user event (control panel, an accepted whole-message "yes") may create an approval,
 never model output. New cloud-facing features must check `core/cloud_policy.cloud_ai_allowed()`.
 
+Memory panel, routines, setup check, OCR and tray (the two `test_ui_*` files need Edge or Chrome):
+
+```powershell
+pytest tests\test_memory_admin_api.py tests\test_routines.py tests\test_setup_check.py tests\test_ocr.py tests\test_tray.py -q
+pytest tests\test_ui_memory_panel.py tests\test_ui_routines_panel.py -q
+```
+
 Patch hygiene:
 
 ```powershell

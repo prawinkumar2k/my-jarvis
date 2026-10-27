@@ -357,6 +357,38 @@ element (bubbles, was a 30%-height strip); compact presence orb; status bar (AI 
 mic, open tasks, all from real endpoints, "unavailable" when missing); welcome text with suggested
 commands; approval card above the composer listing exactly what one yes covers; Automation settings.
 
+### Local model comparison (measured 2026-10-27, same script and tasks, T500 4 GB)
+| | qwen2.5:3b | qwen3.5:4b |
+| --- | --- | --- |
+| Tool accuracy | 17/20 | 20/20 |
+| Invalid tool calls | 0/20 | 0/20 |
+| First token (median) | 0.4 s | 102 s |
+| Tool-call time (median) | ~1-3 s | 15 s |
+| Cold load | ~150 s (first ever) | 99 s |
+| VRAM | 2.1 GB | 2.4 GB (reported) |
+
+Decision: keep `qwen2.5:3b` as the local model. `qwen3.5:4b` picks tools better but a 100 s wait for
+the first word makes voice unusable. Likely cause (not tested): it "thinks" before answering and part
+runs on CPU; a run with thinking disabled was not done, so a faster setting may exist.
+
+### Memory panel, routines, setup check, OCR, tray (2026-10-27)
+- **Memory panel** (`core/memory_admin.py`, `/api/security/memory*`): list, edit, forget, export, private
+  mode, clear all (needs the typed phrase `DELETE ALL`). Secret-looking text is refused. Not built:
+  per-item retention periods.
+- **Routines** (`core/routines.py`, `/api/security/routines*`, tools `programar_rutina`, `ver_rutinas`,
+  `cancelar_rutina`): a tool at a time on a schedule (default: daily summary at 08:00). Only tools that
+  never need approval may be scheduled; a run missed while JARVIS was off fires once. Results are kept
+  and shown in the panel.
+- **Setup check** (`core/setup_check.py`, `/api/security/setup-check`): AI keys present (never shown),
+  microphone, FFmpeg, offline speech model, startup entry, each with the exact fix.
+- **OCR** (`core/ocr.py`, tools `leer_texto_pantalla`, `leer_texto_imagen`): Windows built-in OCR,
+  offline. Screenshot is taken only on request and deleted straight away; lines that look like
+  passwords / keys / card numbers / codes are hidden; the text is handed over as a quote, not as
+  instructions; image files only inside the allowed folders. Tested with the real engine on a
+  generated image.
+- **Tray** (`core/tray.py`): Open JARVIS / Quit JARVIS. Optional; does not keep JARVIS running after the
+  window closes.
+
 ## Phases D–I
 
 Not started.

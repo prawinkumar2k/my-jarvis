@@ -82,7 +82,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Notes by voice, daily summary, health check | VERIFIED | |
 | Spoken startup report with Chennai weather | VERIFIED | |
 | Repeating reminders (daily / weekdays / weekly), quiet hours | VERIFIED (unit) | Fixed-clock tests incl. a week of downtime = one missed fire; alarms and timers ignore quiet hours |
-| Scheduled routines / daily summaries on a schedule | MISSING | |
+| Scheduled routines / daily summaries on a schedule | VERIFIED (unit + browser, mocked backend) | Only tools that never need approval can be scheduled; missed runs fire once; results kept, panel + voice tools |
+| Memory panel (list / edit / forget / export / private mode / clear all) | VERIFIED (unit + browser, mocked backend) | Clear all needs the typed phrase; no per-item retention rules yet |
 
 ## Startup, safety, reliability
 
@@ -95,7 +96,9 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | API key in Windows Credential Manager | MISSING | Key is in `.env` (git-ignored) |
 | Persistent multi-step tasks resumed after restart | VERIFIED | Unit tests + real UI run: resume, approval pause, approve, done 3/3 |
 | Natural language -> saved plan -> tools -> approval | VERIFIED | Real Gemini: built a 3-step task, ran 2, paused install for approval, reported accurately |
-| Tray icon | MISSING | Needs the `pystray` package (approval) |
+| Tray icon (Open / Quit) | VERIFIED (unit) / UNVERIFIED on screen | `pystray` installed (small, listed in requirements-optional.txt); closing the window still quits; `JARVIS_TRAY_ENABLED=false` turns it off |
+| First-run setup check (AI keys, mic, FFmpeg, speech, startup) with exact fixes | VERIFIED (unit + browser, mocked backend) | Read-only; never shows key values |
+| Read text on screen / in an image (offline Windows OCR) | VERIFIED (real OCR on a generated image) | Screenshot deleted after use; password/key/card/code lines hidden; text treated as untrusted quote |
 | Launcher: window at once, waits up to 300 s, recovers a blank WebView2 | VERIFIED (unit) + reproduced | Blank hidden window reproduced under pythonw; now retried, then opened in the default browser |
 | Voice no longer cut by short noise / speaker echo | VERIFIED (unit) | Time-based barge-in; real-room behaviour needs your confirmation |
 | Web search without Tavily/Brave keys | VERIFIED | Real: Chennai weather with sources via Gemini Google Search grounding; blocked in local_only |

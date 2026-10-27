@@ -201,6 +201,69 @@ def start_backend_watchdog(holder, spawn, *, interval=5.0, max_restarts=3, windo
     return thread
 
 
+STARTING_HTML = """<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;
+background:#000;color:#00e5ff;font-family:Segoe UI,sans-serif;letter-spacing:2px}
+.ring{width:90px;height:90px;border:3px solid #00e5ff33;border-top-color:#00e5ff;border-radius:50%;
+animation:spin 1.2s linear infinite;margin-bottom:28px}@keyframes spin{to{transform:rotate(360deg)}}
+p{color:#7fdfff;font-size:14px;letter-spacing:1px}</style></head><body>
+<div class="ring"></div><h2>STARTING J.A.R.V.I.S.</h2>
+<p>Loading voice and AI models. Right after Windows starts this can take a few minutes.</p></body></html>"""
+
+
+def failed_html(reason: str) -> str:
+    import html
+
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'></head>"
+        "<body style='background:#000;color:#ff6b6b;font-family:Segoe UI,sans-serif;padding:40px'>"
+        f"<h2>JARVIS could not start</h2><p>{html.escape(reason)}</p>"
+        "<p style='color:#ccc'>Close this window and open JARVIS again. Details are in "
+        "%LOCALAPPDATA%/Jarvis/logs/startup.log.</p></body></html>"
+    )
+
+
+UI_LOAD_TIMEOUT = 45  # seconds for WebView2 to show the UI before retrying
+
+
+def route_pywebview_logs() -> None:
+    """pywebview reports WebView2 start-up failures only through its logger, which has no
+    output in the windowless launcher; send them to the startup log."""
+    import logging
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("[pywebview] %(levelname)s %(message)s"))
+    logger = logging.getLogger("pywebview")
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+
+
+def backend_start_timeout() -> int:
+    """Seconds to wait for the backend. Right after Windows login the PC is busy and
+    start-up took ~135 s on the dev laptop, so the old 90 s limit left a backend
+    running with no window."""
+    try:
+        return max(30, min(900, int(float(os.getenv("JARVIS_BACKEND_START_TIMEOUT") or 300))))
+    except ValueError:
+        return 300
+
+
+def stop_process_tree(proc) -> None:
+    """Stop a process and its children. In a venv, sys.executable is a small launcher
+    that starts the real Python as a child, so terminate() alone leaves the backend running."""
+    if proc is None or proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            capture_output=True,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    else:
+        proc.terminate()
+
+
 def is_backend_running(url):
     try:
         response = requests.get(f"{url}/api/status", timeout=1)
@@ -266,33 +329,19 @@ def start_app():
                 )
 
             backend_proc = spawn_backend()
-
-            # Wait up to 90s because local ML models can be heavy.
-            attempts = 0
-            while attempts < 90:
-                if is_backend_running(url):
-                    print("[SYSTEM] Server ready.")
-                    break
-                time.sleep(1)
-                attempts += 1
-                if attempts % 10 == 0:
-                    print(f"[SYSTEM] Waiting for core ({attempts}s)...")
-            else:
-                print("[ERROR] Core did not respond after 90s. Check terminal.")
-                if backend_proc:
-                    backend_proc.terminate()
-                return
         else:
             print("[SYSTEM] Server is already running.")
+            spawn_backend = None
 
         backend_holder = [backend_proc]
-        if backend_proc is not None:
-            start_backend_watchdog(backend_holder, spawn_backend)
 
-        # 3. Create desktop window
+        # 3. Create the desktop window at once. While the core is still loading
+        # (it took ~135 s right after login on the dev laptop) it shows a
+        # "Starting JARVIS" page instead of nothing.
         window = webview.create_window(
             'J.A.R.V.I.S. - Just A Rather Very Intelligent System',
-            url,
+            None if backend_proc is not None else url,
+            html=STARTING_HTML if backend_proc is not None else None,
             width=1366,
             height=768,
             min_size=(1024, 768),
@@ -304,8 +353,7 @@ def start_app():
         def on_closed():
             print("[SYSTEM] Closing application...")
             proc, backend_holder[0] = backend_holder[0], None  # stop the watchdog first
-            if proc:
-                proc.terminate()
+            stop_process_tree(proc)
             cleanup_temporary_storage()
             os._exit(0)
 
@@ -324,8 +372,65 @@ def start_app():
         if hasattr(window.events, "shown"):
             window.events.shown += on_shown
 
+        def ensure_ui_loaded():
+            """WebView2 sometimes fails to initialise on a busy PC; pywebview then only logs it
+            and leaves a blank, hidden window. Retry once, then fall back to the normal browser."""
+            for attempt in (1, 2):
+                if window.events.loaded.wait(UI_LOAD_TIMEOUT):
+                    if attempt > 1:
+                        print("[SYSTEM] User interface loaded after a retry.", flush=True)
+                    return True
+                print(f"[WARN] User interface did not load within {UI_LOAD_TIMEOUT}s (attempt {attempt}).", flush=True)
+                if attempt == 2:
+                    break
+                try:
+                    window.show()
+                    window.load_url(url)
+                except Exception as exc:
+                    print(f"[WARN] Reload failed: {type(exc).__name__}", flush=True)
+            print("[ERROR] Desktop window could not show JARVIS; opening it in the default browser instead.", flush=True)
+            import webbrowser
+
+            webbrowser.open(url)
+            return False
+
+        def wait_for_core():
+            """Runs after the window opens: wait for the core, then show the real UI."""
+            proc = backend_holder[0]
+            if proc is None:
+                ensure_ui_loaded()
+                return
+            limit = backend_start_timeout()
+            started = time.monotonic()
+            next_note = 15
+            while True:
+                if backend_holder[0] is None:  # window closed meanwhile
+                    return
+                if is_backend_running(url):
+                    print(f"[SYSTEM] Server ready after {time.monotonic() - started:.0f}s.", flush=True)
+                    start_backend_watchdog(backend_holder, spawn_backend)
+                    window.events.loaded.clear()  # the "starting" page already fired it
+                    window.load_url(url)
+                    ensure_ui_loaded()
+                    return
+                if proc.poll() is not None:
+                    print(f"[ERROR] Core exited during start-up (code {proc.returncode}).", flush=True)
+                    window.load_html(failed_html(f"The JARVIS core stopped while starting (code {proc.returncode})."))
+                    return
+                waited = time.monotonic() - started
+                if waited >= limit:
+                    print(f"[ERROR] Core did not respond after {limit}s; stopping it so nothing runs hidden.", flush=True)
+                    stop_process_tree(proc)
+                    backend_holder[0] = None
+                    window.load_html(failed_html(f"The JARVIS core did not start within {limit // 60} minutes."))
+                    return
+                if waited >= next_note:
+                    print(f"[SYSTEM] Waiting for core ({waited:.0f}s)...", flush=True)
+                    next_note += 15
+                time.sleep(1)
+
         # 4. Start desktop app with persistent Edge Chromium storage.
-        print("[SYSTEM] Opening user interface...")
+        print("[SYSTEM] Opening user interface...", flush=True)
         # Let the desktop window speak without a click so it can boot hands-free,
         # and skip the disk cache: the UI is served locally, and a stale cached
         # module after an update breaks the app.
@@ -337,6 +442,7 @@ def start_app():
 
         try:
             webview.start(
+                func=wait_for_core,
                 gui=gui_engine,
                 debug=False,
                 private_mode=False,
@@ -348,6 +454,7 @@ def start_app():
                 print("[SYSTEM] Default webview storage locked; using fresh isolated storage...")
                 fallback_storage = tempfile.mkdtemp(prefix="jarvis-webview-isolated-")
                 webview.start(
+                    func=wait_for_core,
                     gui=gui_engine,
                     debug=False,
                     private_mode=False,
@@ -362,6 +469,7 @@ def start_app():
 
 if __name__ == "__main__":
     configure_startup_log()
+    route_pywebview_logs()
     set_windows_app_identity()
     if not acquire_single_instance():
         print("[SYSTEM] JARVIS is already running; not starting a second instance.")

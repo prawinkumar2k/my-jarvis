@@ -34,6 +34,9 @@ def store(monkeypatch, tmp_path):
     monkeypatch.setattr(memory_tools, "_forget_cognitive_copy", lambda _pid, fact: forgotten.append(fact))
     monkeypatch.setattr("modules.memory.service.unified_memory.save_cognitive_memory", lambda **_k: None, raising=False)
     monkeypatch.setattr(privacy, "_state_file", lambda: tmp_path / "private_mode.json")
+    from core import memory_admin
+
+    monkeypatch.setattr(memory_admin, "_retention_path", lambda: tmp_path / "memory_retention.json")
     privacy.set_private_mode(False)
     yield data, forgotten
     privacy.set_private_mode(False)
@@ -122,3 +125,38 @@ def test_hostile_origin_is_refused(store):
         return (await client.get("/api/security/memory", headers={"Origin": "https://evil.example"})).status_code
 
     assert asyncio.run(run()) == 403
+
+
+def test_retention_forgets_old_memories_and_keeps_new_ones(store):
+    from datetime import datetime, timedelta
+
+    from core import memory_admin
+
+    data, forgotten = store
+    start = datetime(2026, 1, 1)
+    assert memory_admin.prune_expired(now=start) == 0  # first look: both memories are dated "now"
+    data["facts"] += "\n- Newer fact"
+    memory_admin.set_retention_days(30)
+    assert memory_admin.prune_expired(now=start + timedelta(days=10)) == 0
+    data["facts"] += "\n- Fact from day 20"
+    memory_admin.prune_expired(now=start + timedelta(days=20))
+    assert memory_admin.prune_expired(now=start + timedelta(days=40)) == 2  # the two from day 0
+    assert data["facts"].count("- ") == 2 and "Likes tea" in forgotten and "Project: my-jarvis" in forgotten
+    assert memory_admin.prune_expired(now=start + timedelta(days=60)) == 2  # the day-10 and day-20 facts
+    assert memory_admin.retention_days() == 30 and data["facts"].count("- ") == 0
+
+
+def test_retention_forever_removes_nothing_and_bad_values_are_refused(store):
+    from datetime import datetime, timedelta
+
+    from core import memory_admin
+
+    data, _ = store
+    memory_admin.prune_expired(now=datetime(2026, 1, 1))
+    status, _, body = call("post", "/api/security/memory/retention", {"days": 0})
+    assert status == 200 and body["retention_days"] == 0 and body["retention_choices"] == [0, 30, 90, 365]
+    assert memory_admin.prune_expired(now=datetime(2036, 1, 1) + timedelta(days=1)) == 0 and data["facts"].count("- ") == 2
+    for bad in (7, -1, "30", True, None):
+        status, _, _ = call("post", "/api/security/memory/retention", {"days": bad})
+        assert status == 400
+    assert memory_admin.retention_days() == 0

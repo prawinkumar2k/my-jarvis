@@ -144,12 +144,13 @@ export function initAssistantUi({ t, submitCommand, taskAction, fetchImpl = (...
     });
 
     // ── automation settings ───────────────────────────────────────
-    const auto = { voice: $('auto-voice'), low: $('auto-low-risk'), once: $('auto-once'), box: $('auto-always'), active: $('auto-approvals'), revoke: $('auto-revoke'),
+    const auto = { voice: $('auto-voice'), screen: $('auto-screen'), low: $('auto-low-risk'), once: $('auto-once'), box: $('auto-always'), active: $('auto-approvals'), revoke: $('auto-revoke'),
         status: $('auto-status') };
 
     function renderAutomation(data) {
         if (!auto.low || !data?.preferences) return;
         if (auto.voice) auto.voice.checked = data.preferences.voice_autostart !== false;
+        if (auto.screen) auto.screen.checked = data.preferences.ask_before_screen_upload === true;
         auto.low.checked = data.preferences.auto_low_risk;
         auto.once.checked = data.preferences.ask_once_per_task;
         auto.box.replaceChildren(...CATEGORIES.map((name) => {
@@ -177,6 +178,7 @@ export function initAssistantUi({ t, submitCommand, taskAction, fetchImpl = (...
     async function saveAutomation() {
         const body = {
             voice_autostart: auto.voice ? auto.voice.checked : true,
+            ask_before_screen_upload: auto.screen ? auto.screen.checked : false,
             auto_low_risk: auto.low.checked,
             ask_once_per_task: auto.once.checked,
             always_confirm: [...auto.box.querySelectorAll('input:checked')].map((input) => input.value),

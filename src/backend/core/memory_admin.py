@@ -8,9 +8,15 @@ the cloud.
 
 from __future__ import annotations
 
-from datetime import datetime
+import json
+import os
+import threading
+from datetime import datetime, timedelta
+from pathlib import Path
 
 DEFAULT_PROFILE = "web_default"
+RETENTION_CHOICES = (0, 30, 90, 365)  # days a memory is kept; 0 = until you forget it
+_lock = threading.RLock()
 
 
 def _pid(profile_id: str | None) -> str:
@@ -68,6 +74,85 @@ def clear_all(profile_id: str | None) -> int:
             break
         removed += 1
     return removed
+
+
+def _retention_path() -> Path:
+    from core.runtime_paths import resolve_runtime_paths
+
+    return resolve_runtime_paths().memory / "memory_retention.json"
+
+
+def _load_retention() -> dict:
+    try:
+        data = json.loads(_retention_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    days = data.get("days")
+    saved = data.get("first_seen")
+    return {"days": days if days in RETENTION_CHOICES else 0, "first_seen": saved if isinstance(saved, dict) else {}}
+
+
+def _save_retention(data: dict) -> None:
+    path = _retention_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def retention_days() -> int:
+    return _load_retention()["days"]
+
+
+def set_retention_days(days: int) -> int:
+    if days not in RETENTION_CHOICES:
+        raise ValueError(f"Choose one of {', '.join(str(d) for d in RETENTION_CHOICES)} days (0 keeps memories until you forget them).")
+    with _lock:
+        data = _load_retention()
+        data["days"] = days
+        _save_retention(data)
+    return days
+
+
+def prune_expired(profile_id: str | None = None, now: datetime | None = None) -> int:
+    """Forget memories older than the retention period. Returns how many were removed.
+
+    Memories carry no date of their own, so each one is dated the first time it is seen here; memories
+    that existed before this feature count from that first look, not from when they were really saved.
+    """
+    from tools.memory import _fact_lines
+
+    now = now or datetime.now()
+    pid = _pid(profile_id)
+    with _lock:
+        data = _load_retention()
+        seen = data["first_seen"].setdefault(pid, {})
+        facts = _fact_lines(pid)
+        changed = False
+        for fact in facts:
+            if fact not in seen:
+                seen[fact] = now.isoformat(timespec="seconds")
+                changed = True
+        for gone in [fact for fact in seen if fact not in facts]:
+            del seen[gone]
+            changed = True
+        removed = 0
+        days = data["days"]
+        if days:
+            cutoff = now - timedelta(days=days)
+            for number in range(len(facts), 0, -1):  # from the end so numbers stay valid
+                try:
+                    stamped = datetime.fromisoformat(seen[facts[number - 1]])
+                except (KeyError, ValueError):
+                    continue
+                if stamped < cutoff and forget_fact(profile_id, number)[0]:
+                    seen.pop(facts[number - 1], None)
+                    removed += 1
+                    changed = True
+        if changed:
+            _save_retention(data)
+        return removed
 
 
 def export_facts(profile_id: str | None = None) -> dict:

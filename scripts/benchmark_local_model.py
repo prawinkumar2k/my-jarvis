@@ -73,10 +73,17 @@ def _vram_mb() -> float | None:
         return None
 
 
+THINK = None  # --no-think sets False: models that reason first can skip it (Ollama "think")
+
+
+def _with_think(body: dict) -> dict:
+    return body if THINK is None else {**body, "think": THINK}
+
+
 def chat_latency(model: str, prompt: str) -> tuple[float, float]:
     start = time.perf_counter()
     first = None
-    with _post("/api/chat", {"model": model, "stream": True, "messages": [{"role": "user", "content": prompt}]}) as r:
+    with _post("/api/chat", _with_think({"model": model, "stream": True, "messages": [{"role": "user", "content": prompt}]})) as r:
         for line in r:
             data = json.loads(line)
             if first is None and data.get("message", {}).get("content"):
@@ -90,7 +97,7 @@ def tool_case(model: str, prompt: str) -> tuple[float, list]:
     body = {"model": model, "stream": False, "tools": [{"type": "function", "function": t} for t in TOOLS],
             "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]}
     start = time.perf_counter()
-    with _post("/api/chat", body) as r:
+    with _post("/api/chat", _with_think(body)) as r:
         data = json.load(r)
     return time.perf_counter() - start, data.get("message", {}).get("tool_calls") or []
 
@@ -119,7 +126,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("model", nargs="?", default="qwen2.5:3b")
     parser.add_argument("--runs", type=int, default=2)
+    parser.add_argument("--no-think", action="store_true", help="ask Ollama not to let the model reason first")
     a = parser.parse_args()
+    global THINK
+    THINK = False if a.no_think else None
 
     vram_before = _vram_mb()
     load_start = time.perf_counter()

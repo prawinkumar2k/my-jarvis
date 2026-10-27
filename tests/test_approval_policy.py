@@ -104,6 +104,16 @@ def test_clipboard_stays_local_in_local_only_mode_and_asks_once_otherwise(monkey
     assert tier("leer_portapapeles") is Tier.AUTO
 
 
+def test_screen_upload_asks_only_when_the_user_turned_that_on(monkeypatch):
+    assert tier("analizar_pantalla") is Tier.AUTO  # default: unchanged behaviour
+    ap.save_prefs({**ap.load_prefs(), "ask_before_screen_upload": True})
+    assert tier("analizar_pantalla") is Tier.EXPLICIT
+    assert not ap.resolve("analizar_pantalla", {}, confirmed=False).effective_confirmed
+    assert ap.resolve("analizar_pantalla", {}, confirmed=True).effective_confirmed
+    monkeypatch.setenv("JARVIS_AI_MODE", "local_only")  # nothing is uploaded, so nothing to ask
+    assert tier("analizar_pantalla") is Tier.AUTO
+
+
 def test_user_override_in_the_policy_always_wins():
     overrides = {"abrir_aplicacion": {"risk_level": "critical", "allowed_profiles": ["admin"], "requires_confirmation": True}}
     assert ap.classify("abrir_aplicacion", {}, overrides=overrides).tier is Tier.EXPLICIT
@@ -163,7 +173,7 @@ def test_emergency_stop_forgets_every_approval():
 def test_preferences_are_validated_and_persisted():
     saved = ap.save_prefs({"auto_low_risk": False, "always_confirm": ["install", "hack", "browser"], "junk": 1})
     assert saved == {"auto_low_risk": False, "ask_once_per_task": True, "always_confirm": ["browser", "install"],
-                     "voice_autostart": True}
+                     "voice_autostart": True, "ask_before_screen_upload": False}
     assert ap.load_prefs() == saved
     assert ap.validate_prefs({"auto_low_risk": "yes"})["auto_low_risk"] is True  # wrong type is ignored
 

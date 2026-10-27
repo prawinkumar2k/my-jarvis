@@ -31,11 +31,12 @@ class FakeMemory:
     """Same JSON shapes as /api/security/memory*; records every request."""
 
     def __init__(self, facts):
-        self.facts, self.private_on, self.calls = list(facts), False, []
+        self.facts, self.private_on, self.calls, self.days = list(facts), False, [], 0
 
     def view(self, query=""):
         shown = [{"n": i, "text": f} for i, f in enumerate(self.facts, 1) if query.lower() in f.lower()]
-        return {"facts": shown, "count": len(self.facts), "private_mode": self.private_on}
+        return {"facts": shown, "count": len(self.facts), "private_mode": self.private_on,
+                "retention_days": self.days, "retention_choices": [0, 30, 90, 365]}
 
     def reply(self, route, body, status=200):
         route.fulfill(status=status, content_type="application/json", body=json.dumps(body))
@@ -70,6 +71,11 @@ class FakeMemory:
         self_.calls.append(("private", self_.private_on))
         self_.reply(route, {"private_mode": self_.private_on})
 
+    def retention(self, route):
+        self.days = json.loads(route.request.post_data)["days"]
+        self.calls.append(("retention", self.days))
+        self.reply(route, {"removed": 0, **self.view()})
+
     def clear(self, route):
         self.calls.append(("clear", json.loads(route.request.post_data)))
         removed, self.facts = len(self.facts), []
@@ -84,6 +90,7 @@ class FakeMemory:
             "/api/security/memory": self.collection,
             "/api/security/memory/private": self.private,
             "/api/security/memory/clear": self.clear,
+            "/api/security/memory/retention": self.retention,
             "/api/security/memory/export": self.export,
             **{f"/api/security/memory/{n}/{name}": self.action(name) for n in range(1, 6) for name in ("delete", "edit")},
         }
@@ -141,6 +148,14 @@ def test_private_mode_toggle_reaches_the_backend(browser, base_url):
     js_click(page, "#mem-private")
     page.wait_for_function("document.getElementById('mem-status').textContent.includes('ON')")
     assert ("private", True) in fake.calls and fake.private_on is True
+
+
+def test_retention_choice_is_listed_and_saved(browser, base_url):
+    page, fake = panel(browser, base_url)
+    assert page.locator("#mem-retention option").count() == 4 and page.input_value("#mem-retention") == "0"
+    page.evaluate("const s = document.getElementById('mem-retention'); s.value = '90'; s.dispatchEvent(new Event('change', {bubbles: true}))")
+    page.wait_for_function("document.getElementById('mem-status').textContent.includes('Saved')")
+    assert ("retention", 90) in fake.calls and page.input_value("#mem-retention") == "90"
 
 
 def test_forget_all_needs_a_second_click_and_the_exact_phrase_is_sent(browser, base_url):

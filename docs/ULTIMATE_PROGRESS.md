@@ -358,27 +358,38 @@ mic, open tasks, all from real endpoints, "unavailable" when missing); welcome t
 commands; approval card above the composer listing exactly what one yes covers; Automation settings.
 
 ### Local model comparison (measured 2026-10-27, same script and tasks, T500 4 GB)
-| | qwen2.5:3b | qwen3.5:4b |
-| --- | --- | --- |
-| Tool accuracy | 17/20 | 20/20 |
-| Invalid tool calls | 0/20 | 0/20 |
-| First token (median) | 0.4 s | 102 s |
-| Tool-call time (median) | ~1-3 s | 15 s |
-| Cold load | ~150 s (first ever) | 99 s |
-| VRAM | 2.1 GB | 2.4 GB (reported) |
+| | qwen2.5:3b | qwen3.5:4b, default | qwen3.5:4b, thinking off |
+| --- | --- | --- | --- |
+| Tool accuracy | 17/20 | 20/20 | 20/20 |
+| Invalid tool calls | 0/20 | 0/20 | 0/20 |
+| First token (median) | 0.40 s | 102 s | 0.52 s |
+| Short reply (median) | 1.3 s | 105 s | 2.65 s |
+| Tool call (median) | 1.4 s | 15 s | 7.5 s |
+| Cold load | 31 s | 99 s | 11.5 s (already on disk cache) |
+| VRAM | 2.1 GB | 2.4 GB | 2.4 GB |
 
-Decision: keep `qwen2.5:3b` as the local model. `qwen3.5:4b` picks tools better but a 100 s wait for
-the first word makes voice unusable. Likely cause (not tested): it "thinks" before answering and part
-runs on CPU; a run with thinking disabled was not done, so a faster setting may exist.
+Findings: `qwen3.5:4b` reasons for ~100 s before its first word unless told not to. Ollama's
+OpenAI-compatible `/v1` endpoint (what JARVIS uses) ignores `think: false` but honours
+`reasoning_effort: "none"`; with it a short answer took 1.7 s instead of 44-50 s (probe). JARVIS now sends
+it to every local client (`OLLAMA_REASONING=none`, set `default` to let a model reason); other models
+ignore it.
+Decision: keep `qwen2.5:3b` as the default local model: it is 5x faster per tool call (1.4 s vs 7.5 s),
+which matters for voice. `qwen3.5:4b` is better at choosing tools (20/20 vs 17/20), so it is the
+recommended opt-in when accuracy matters more than speed (`OLLAMA_MODEL=qwen3.5:4b`, `ollama pull
+qwen3.5:4b`). Thanglish quality of either was not scored; the 20 tool tasks are mostly English.
 
 ### Memory panel, routines, setup check, OCR, tray (2026-10-27)
 - **Memory panel** (`core/memory_admin.py`, `/api/security/memory*`): list, edit, forget, export, private
-  mode, clear all (needs the typed phrase `DELETE ALL`). Secret-looking text is refused. Not built:
-  per-item retention periods.
+  mode, clear all (needs the typed phrase `DELETE ALL`). Secret-looking text is refused. **Retention**:
+  "forget memories after never / 30 / 90 / 365 days". Memories have no date of their own, so each is dated
+  the first time it is seen; memories that existed before this feature count from that first look. Expired
+  ones are forgotten (graph copy too) by the background loop every 30 s and when the setting changes.
 - **Routines** (`core/routines.py`, `/api/security/routines*`, tools `programar_rutina`, `ver_rutinas`,
   `cancelar_rutina`): a tool at a time on a schedule (default: daily summary at 08:00). Only tools that
   never need approval may be scheduled; a run missed while JARVIS was off fires once. Results are kept
   and shown in the panel.
+- **Ask before a screenshot is uploaded**: setting `ask_before_screen_upload` (Automation panel, off by default).
+  When on, `analizar_pantalla` needs your approval every time; in local-only mode nothing is uploaded so nothing is asked.
 - **Setup check** (`core/setup_check.py`, `/api/security/setup-check`): AI keys present (never shown),
   microphone, FFmpeg, offline speech model, startup entry, each with the exact fix.
 - **OCR** (`core/ocr.py`, tools `leer_texto_pantalla`, `leer_texto_imagen`): Windows built-in OCR,

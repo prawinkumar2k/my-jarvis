@@ -377,6 +377,7 @@
                         <span class="label" data-i18n="auto_title">AUTOMATION</span>
                     </div>
                     <div id="automation-settings" class="automation-settings">
+                        <label class="auto-check"><input type="checkbox" id="auto-screen"><span data-i18n="auto_screen">Ask me before a screenshot is sent to the cloud AI</span></label>
                         <label class="auto-check"><input type="checkbox" id="auto-voice"><span data-i18n="auto_voice">Start listening by voice as soon as JARVIS opens</span></label>
                         <label class="auto-check"><input type="checkbox" id="auto-low-risk"><span data-i18n="auto_low_risk">Run low-risk actions without asking</span></label>
                         <label class="auto-check"><input type="checkbox" id="auto-once"><span data-i18n="auto_once">Ask once per task for medium-risk actions</span></label>
@@ -416,6 +417,8 @@
                     </div>
                     <div id="memory-panel" class="memory-panel">
                         <label class="auto-check"><input type="checkbox" id="mem-private"><span data-i18n="mem_private">Private mode: save nothing new</span></label>
+                        <label class="auto-check"><span data-i18n="mem_keep">Forget memories after</span>
+                            <select id="mem-retention" class="mem-input"></select></label>
                         <input id="mem-search" type="search" class="mem-input" maxlength="80" data-i18n-placeholder="mem_search" placeholder="Search memories" autocomplete="off">
                         <ul id="mem-list" class="mem-list custom-scrollbar"></ul>
                         <div class="mem-add">

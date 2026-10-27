@@ -16,7 +16,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Connection test (model, latency, problem) | VERIFIED (unit) | `POST /api/security/ai-test`; "nee ok-a?" uses it |
 | Backup AI when Gemini is rate-limited | VERIFIED | Gemini backup model `gemini-3.1-flash-lite` (real: answered while 2.5-flash daily quota was exhausted), then Groq, then Ollama |
 | Real Gemini tool use, context, multi-step | VERIFIED | Live: tool ran and result fed back; codeword remembered across turns; two tools chained in one request |
-| Local AI (Ollama `qwen2.5:3b`, Q4_K_M, 1.93 GB) | VERIFIED | Real inference: cold load 150 s once, then 0.2–3.5 s; 100% on the T500 GPU; tool calling works; Thanglish quality poor |
+| Local AI (Ollama `qwen2.5:3b`, Q4_K_M, 1.93 GB; `qwen3.5:4b` opt-in, 20/20 tools but 5x slower per call) | VERIFIED | Real inference: cold load 150 s once, then 0.2–3.5 s; 100% on the T500 GPU; tool calling works; Thanglish quality poor |
 | AI mode `cloud_first` / `local_first` / `local_only` | VERIFIED (unit) | Default cloud_first: Gemini → Groq → Ollama |
 | Offline everyday commands (no AI call) | VERIFIED (unit) | apps, media, brightness, screenshot, timers, alarms, notes, summary, self check, layouts |
 | Streaming text while typing | PARTIAL | `/api/chat/stream` on the default pipeline sends the reply in one final event; token streaming exists only in the legacy pipeline (now with fallback) |
@@ -83,7 +83,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Spoken startup report with Chennai weather | VERIFIED | |
 | Repeating reminders (daily / weekdays / weekly), quiet hours | VERIFIED (unit) | Fixed-clock tests incl. a week of downtime = one missed fire; alarms and timers ignore quiet hours |
 | Scheduled routines / daily summaries on a schedule | VERIFIED (unit + browser, mocked backend) | Only tools that never need approval can be scheduled; missed runs fire once; results kept, panel + voice tools |
-| Memory panel (list / edit / forget / export / private mode / clear all) | VERIFIED (unit + browser, mocked backend) | Clear all needs the typed phrase; no per-item retention rules yet |
+| Memory panel (list / edit / forget / export / private mode / clear all / auto-forget after 30-90-365 days) | VERIFIED (unit + browser, mocked backend) | Clear all needs the typed phrase; old memories are dated from first sight |
 
 ## Startup, safety, reliability
 
@@ -96,6 +96,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | API key in Windows Credential Manager | MISSING | Key is in `.env` (git-ignored) |
 | Persistent multi-step tasks resumed after restart | VERIFIED | Unit tests + real UI run: resume, approval pause, approve, done 3/3 |
 | Natural language -> saved plan -> tools -> approval | VERIFIED | Real Gemini: built a 3-step task, ran 2, paused install for approval, reported accurately |
+| Ask before a screenshot goes to the cloud AI | VERIFIED (unit) | Setting, off by default; always asks when on |
 | Tray icon (Open / Quit) | VERIFIED (unit) / UNVERIFIED on screen | `pystray` installed (small, listed in requirements-optional.txt); closing the window still quits; `JARVIS_TRAY_ENABLED=false` turns it off |
 | First-run setup check (AI keys, mic, FFmpeg, speech, startup) with exact fixes | VERIFIED (unit + browser, mocked backend) | Read-only; never shows key values |
 | Read text on screen / in an image (offline Windows OCR) | VERIFIED (real OCR on a generated image) | Screenshot deleted after use; password/key/card/code lines hidden; text treated as untrusted quote |

@@ -249,6 +249,16 @@ async def _recover_tasks():
         print(f"[WARN tasks] recovery failed: {type(exc).__name__}")
 
 
+def _prune_memory() -> None:
+    """Forget memories past the retention period the user chose (does nothing while it is "forever")."""
+    from core import memory_admin
+
+    try:
+        memory_admin.prune_expired()
+    except Exception as exc:
+        print(f"[WARN memory] retention: {type(exc).__name__}")
+
+
 async def _routine_loop(interval: float = 30.0) -> None:
     """Run due routines (daily summary ...) and show each result as a Windows notification."""
     from core import routines
@@ -256,6 +266,7 @@ async def _routine_loop(interval: float = 30.0) -> None:
 
     while True:
         try:
+            await asyncio.to_thread(_prune_memory)
             for result in await asyncio.to_thread(routines.run_due):
                 title = f"JARVIS: {result['name']}" + (" (missed while JARVIS was closed)" if result.get("missed") else "")
                 body = result["text"] if result["ok"] else f"Could not run: {result['text']}"
@@ -363,7 +374,8 @@ def _memory_view(profile_id: str | None, query: str = "") -> dict:
     from core.privacy import is_private_mode
 
     facts = memory_admin.list_facts(profile_id, query)
-    return {"facts": facts, "count": len(memory_admin.list_facts(profile_id)), "private_mode": is_private_mode()}
+    return {"facts": facts, "count": len(memory_admin.list_facts(profile_id)), "private_mode": is_private_mode(),
+            "retention_days": memory_admin.retention_days(), "retention_choices": list(memory_admin.RETENTION_CHOICES)}
 
 
 @security_bp.route("/api/security/memory", methods=["GET", "POST"])
@@ -433,6 +445,23 @@ async def memory_private_mode():
     return jsonify({"private_mode": set_private_mode(enabled)})
 
 
+@security_bp.route("/api/security/memory/retention", methods=["POST"])
+async def memory_retention():
+    """Keep memories for {"days": 0|30|90|365} (0 = until you forget them); older ones are forgotten."""
+    from core import memory_admin
+
+    data = await request.get_json(silent=True)
+    days = data.get("days") if isinstance(data, dict) else None
+    if isinstance(days, bool) or not isinstance(days, int):
+        return jsonify({"error": "Field 'days' must be a number."}), 400
+    try:
+        await asyncio.to_thread(memory_admin.set_retention_days, days)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    removed = await asyncio.to_thread(memory_admin.prune_expired)
+    return jsonify({"removed": removed, **await asyncio.to_thread(_memory_view, None)})
+
+
 @security_bp.route("/api/security/memory/clear", methods=["POST"])
 async def memory_clear():
     """Forget every saved memory. Needs {"confirm": "DELETE ALL"} so it cannot happen by accident."""
@@ -497,7 +526,7 @@ async def automation_preferences():
         data = await request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "Send a JSON object."}), 400
-        for flag in ("auto_low_risk", "ask_once_per_task", "voice_autostart"):
+        for flag in ("auto_low_risk", "ask_once_per_task", "voice_autostart", "ask_before_screen_upload"):
             if flag in data and not isinstance(data[flag], bool):
                 return jsonify({"error": f"Field '{flag}' must be true or false."}), 400
         forced = data.get("always_confirm", [])

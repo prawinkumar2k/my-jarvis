@@ -508,3 +508,23 @@ def test_conversation_fallback_is_bounded_when_both_fail(monkeypatch):
     with pytest.raises(LLMServiceError):
         processor._invoke_with_fallback(gemini, [], event="llm_direct_invoke_failed")
     assert (gemini.calls, groq.calls) == (1, 1)  # no retry loop
+
+
+def test_local_ollama_client_is_told_not_to_think_and_cloud_clients_are_not(monkeypatch):
+    created = []
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+
+    monkeypatch.setattr(llm_engine, "_load_chat_openai", lambda: FakeChatOpenAI)
+    env = {"JARVIS_AI_MODE": "local_first", "GEMINI_API_KEY": "fake-gemini", "OLLAMA_MODEL": "qwen3.5:4b"}
+    llm_engine._build_llm_clients(env)
+    local = [c for c in created if "11434" in c["base_url"]]
+    cloud = [c for c in created if "11434" not in c["base_url"]]
+    assert local and all(c["extra_body"] == {"reasoning_effort": "none"} for c in local)
+    assert cloud and all("extra_body" not in c for c in cloud)
+
+    created.clear()
+    llm_engine._build_llm_clients({**env, "OLLAMA_REASONING": "default"})
+    assert all("extra_body" not in c for c in created)

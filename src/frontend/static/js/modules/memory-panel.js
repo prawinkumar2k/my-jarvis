@@ -15,7 +15,7 @@ function el(tag, className, text) {
 export function initMemoryPanel({ t, fetchImpl = (...a) => fetch(...a) }) {
     const $ = (id) => document.getElementById(id);
     const ui = { list: $('mem-list'), count: $('mem-count'), search: $('mem-search'), add: $('mem-add'), input: $('mem-new'),
-        priv: $('mem-private'), exportBtn: $('mem-export'), clear: $('mem-clear'), status: $('mem-status') };
+        priv: $('mem-private'), keep: $('mem-retention'), exportBtn: $('mem-export'), clear: $('mem-clear'), status: $('mem-status') };
     if (!ui.list) return null;
     let clearArmedUntil = 0;
     let clearTimer = null;
@@ -32,6 +32,17 @@ export function initMemoryPanel({ t, fetchImpl = (...a) => fetch(...a) }) {
         if (!data) return;
         if (ui.count) ui.count.textContent = String(data.count ?? 0);
         if (ui.priv) ui.priv.checked = data.private_mode === true;
+        if (ui.keep && Array.isArray(data.retention_choices)) {
+            const choices = data.retention_choices;
+            if (ui.keep.options.length !== choices.length) {
+                ui.keep.replaceChildren(...choices.map((days) => {
+                    const option = el('option', '', days ? t('mem_keep_days').replace('{n}', String(days)) : t('mem_keep_forever'));
+                    option.value = String(days);
+                    return option;
+                }));
+            }
+            ui.keep.value = String(data.retention_days ?? 0);
+        }
         const facts = Array.isArray(data.facts) ? data.facts : [];
         ui.list.replaceChildren(...(facts.length ? facts.map(row) : [el('li', 'control-empty', t(ui.search.value ? 'mem_no_match' : 'mem_empty'))]));
     }
@@ -97,6 +108,13 @@ export function initMemoryPanel({ t, fetchImpl = (...a) => fetch(...a) }) {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: ui.priv.checked }) });
         say(r.ok ? t(r.data.private_mode ? 'mem_private_on' : 'mem_private_off') : r.data.error || `HTTP ${r.status}`);
         refresh();
+    });
+
+    ui.keep?.addEventListener('change', async () => {
+        const r = await call('/api/security/memory/retention', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: Number(ui.keep.value) }) });
+        say(r.ok ? t('mem_keep_saved') : r.data.error || `HTTP ${r.status}`);
+        render(r.data);
     });
 
     ui.exportBtn?.addEventListener('click', async () => {

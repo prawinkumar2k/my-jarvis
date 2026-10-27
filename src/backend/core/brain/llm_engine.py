@@ -391,11 +391,17 @@ def _build_llm_clients(provider_env: Mapping[str, str]):
 
     def create_client(model: str, api_key: str, provider: str):
         timeout = 10
+        extra: dict = {}
         if provider == "ollama":  # local CPU inference is slower than cloud APIs
             try:
                 timeout = max(5, min(300, int(float(provider_env.get("OLLAMA_TIMEOUT_SECONDS") or 60))))
             except ValueError:
                 timeout = 60
+            # Reasoning models (qwen3.5) otherwise "think" for ~100 s before the first word, longer than the
+            # timeout and useless for voice. Ollama's /v1 endpoint ignores `think` but honours this; other
+            # models ignore it. Set OLLAMA_REASONING=default to let a model reason.
+            if str(provider_env.get("OLLAMA_REASONING") or "none").strip().lower() not in {"default", "on", "auto"}:
+                extra["extra_body"] = {"reasoning_effort": "none"}
         return chat_open_ai(
             model=model,
             temperature=0,
@@ -403,6 +409,7 @@ def _build_llm_clients(provider_env: Mapping[str, str]):
             base_url=provider_base_url(provider),
             timeout=timeout,
             max_retries=0,
+            **extra,
         )
 
     primary = create_client(

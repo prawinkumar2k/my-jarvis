@@ -61,7 +61,8 @@ class Resolution:
 # Categories the user can force back to "ask every time" in the automation settings.
 USER_CATEGORIES = ("install", "file_changes", "delete", "browser", "desktop_control", "clipboard", "plans")
 DEFAULT_PREFS: dict[str, Any] = {"auto_low_risk": True, "ask_once_per_task": True, "always_confirm": [],
-                                 "voice_autostart": True}  # listen as soon as JARVIS opens (needs the mic already allowed)
+                                 "voice_autostart": True,  # listen as soon as JARVIS opens (needs the mic already allowed)
+                                 "ask_before_screen_upload": False}  # ask each time a screenshot would go to the cloud AI
 
 _SUBMIT_WORDS = re.compile(
     r"\b(submit|pay|payment|purchase|buy|order|checkout|check out|confirm|send|post|publish|delete|remove|"
@@ -92,7 +93,7 @@ def load_prefs() -> dict[str, Any]:
 
 def validate_prefs(raw: dict[str, Any]) -> dict[str, Any]:
     prefs = dict(DEFAULT_PREFS)
-    for flag in ("auto_low_risk", "ask_once_per_task", "voice_autostart"):
+    for flag in ("auto_low_risk", "ask_once_per_task", "voice_autostart", "ask_before_screen_upload"):
         if isinstance(raw.get(flag), bool):
             prefs[flag] = raw[flag]
     forced = raw.get("always_confirm")
@@ -212,6 +213,8 @@ def classify(tool_name: str, args: dict | None = None, *, prefs: dict[str, Any] 
     if overrides and name in overrides:  # an explicit user override always wins
         tier = Tier.EXPLICIT if policy.requires_confirmation else Tier.AUTO
         return Classification(tier, "user_override", reason="set in your tool policy")
+    if name == "analizar_pantalla" and prefs["ask_before_screen_upload"] and not _local_only():
+        return Classification(Tier.EXPLICIT, "screen_upload", reason="the screenshot is sent to the cloud AI")
     if not policy.requires_confirmation:
         return Classification(Tier.AUTO, "none")
     found = _rule(name, dict(args or {})) or Classification(Tier.EXPLICIT, name, reason="needs your confirmation")

@@ -121,7 +121,7 @@ async def generate_tts():
         t0 = _time.time()
         audio_bytes = None
         engine = "piper"
-        # Natural Gemini voice first; the local Piper voice is the offline fallback.
+        # Natural voices first (Gemini, then the free Edge voice); the local Piper voice is the offline fallback.
         # Both run off the event loop so speaking never stalls other requests.
         from engines import gemini_tts
 
@@ -131,6 +131,15 @@ async def generate_tts():
                 engine = "gemini"
             except gemini_tts.GeminiTTSError as exc:
                 obs_event("gemini_tts_fallback", error=str(exc)[:40])
+        if audio_bytes is None:
+            from engines import edge_voice
+
+            if edge_voice.enabled():
+                try:
+                    audio_bytes = await asyncio.to_thread(edge_voice.synthesize, text)
+                    engine = "edge"
+                except edge_voice.EdgeTTSError as exc:
+                    obs_event("edge_tts_fallback", error=str(exc)[:40])
         if audio_bytes is None:
             audio_bytes = await asyncio.to_thread(_synthesize_audio, text)
         dur = _time.time() - t0

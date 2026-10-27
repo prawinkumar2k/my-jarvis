@@ -31,11 +31,11 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Stop speaking (Esc / STOP VOICE) | VERIFIED | Real browser: Esc stopped the spoken briefing; button hides after speech |
 | Tamil / Thanglish transcription accuracy | BLOCKED | Needs real recordings; harness `scripts/evaluate_stt.py` ready |
 | STT language: follow UI / auto-detect / forced | VERIFIED | Real: English audio detected as en (p=1.0) with UI in Tamil and `JARVIS_STT_LANGUAGE=auto` |
-| Tamil spoken replies (offline) | BLOCKED | No Piper Tamil voice exists; Windows Tamil voice must be added in Settings first |
+| Tamil spoken replies | VERIFIED online (free Edge voice) / BLOCKED offline | Offline Tamil still has no Piper voice |
 | Offline "Hey Jarvis" wake word | UNVERIFIED | Engine + real mic verified; your own voice not yet confirmed |
 | Gemini Live two-way voice, interruption | UNVERIFIED | Used by voice button and wake word; natural voice |
 | Spoken replies | VERIFIED | Gemini voice when quota allows, otherwise local `ryan-high` |
-| Natural voice for every reply | BLOCKED | Gemini TTS free quota is tiny (HTTP 429); needs billing |
+| Natural voice for every reply | VERIFIED (real synthesis) | Free Edge neural voices (Tamil Pallavi, Indian English Neerja) after Gemini; Piper offline fallback; off in local_only. Unofficial service, may change |
 | Voice closes after 45 s silence | UNVERIFIED | Code + tests |
 | Language switch by voice | VERIFIED (unit) | "switch to English", "Tamil-la pesu" |
 
@@ -118,8 +118,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Gmail, Google Calendar | BLOCKED | Needs a Google Cloud OAuth client and your sign-in |
-| Spotify control | BLOCKED | Needs Spotify app credentials |
-| Telegram | BLOCKED | Needs a bot token |
+| Gmail, Google Calendar | BLOCKED | Free: needs your Google OAuth client JSON path and one sign-in (docs/FREE_SETUP_GUIDE.md) |
+| Spotify control | VERIFIED desktop route / BLOCKED web API | Desktop app control needs no credentials; the web API needs Premium |
+| Telegram | BLOCKED | Free: needs your bot token from @BotFather (see docs/FREE_SETUP_GUIDE.md) |
 | Coding agent | MISSING | |
 | Smart home / IoT | MISSING | No devices or APIs configured |

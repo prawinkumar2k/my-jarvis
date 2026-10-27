@@ -29,3 +29,6 @@ pycaw>=1.0; sys_platform == "win32"
 comtypes>=1.1; sys_platform == "win32"
 wmi>=1.5.1; sys_platform == "win32"
 
+
+# Free natural voices (Tamil, Indian English) through Edge read-aloud; needs FFmpeg
+edge-tts>=7,<8

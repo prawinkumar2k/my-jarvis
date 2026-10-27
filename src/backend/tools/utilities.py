@@ -597,7 +597,9 @@ def listar_recordatorios() -> str:
     if not items:
         return "No pending reminders."
     return "Pending reminders:\n" + "\n".join(
-        f"- [{i['id']}] {i['due'][11:16]} ({i['due'][:10]}): {i['text']}" for i in items
+        f"- [{i['id']}] {i['due'][11:16]} ({i['due'][:10]}): {i['text']}"
+        + (f" (repeats {i['repeat']})" if i.get("repeat") else "")
+        for i in items
     )
 
 

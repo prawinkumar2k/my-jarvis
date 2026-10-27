@@ -27,6 +27,7 @@ _LAZY_EXPORTS = {
     "poner_recordatorio": ("tools.utilities", "poner_recordatorio"),
     "limpiar_portapapeles": ("tools.clipboard", "limpiar_portapapeles"),
     "diagnostico_sistema": ("tools.assistant_tools", "diagnostico_sistema"),
+    "recordatorio_recurrente": ("tools.assistant_tools", "recordatorio_recurrente"),
     "buscar_programa": ("tools.winget", "buscar_programa"),
     "ver_programa": ("tools.winget", "ver_programa"),
     "instalar_programa": ("tools.winget", "instalar_programa"),

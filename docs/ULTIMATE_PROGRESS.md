@@ -238,6 +238,50 @@ refused by the tool permission system, so it must be closed manually (Task
 Manager: the `python.exe` running `src/backend/jarvis_backend.py` started at
 19:14) before starting JARVIS normally.
 
+## Reliability pass after real use (2026-10-27)
+
+Reported: JARVIS did not open after a restart, got stuck, and the voice cut off often.
+
+- **No window after login.** The auto-start log showed the backend needed ~135 s
+  (the PC is busy right after Windows starts; 43 s even when idle, mostly
+  importing pywinauto, faster-whisper and LangChain) but the launcher gave up
+  at 90 s and only stopped the small venv stub, leaving the real backend
+  running with no window. The launcher now opens the window at once with a
+  "Starting J.A.R.V.I.S." page, waits up to 300 s, stops the whole process
+  tree if the core truly fails and shows why.
+- **Blank, hidden window.** Reproduced: with a healthy backend the window
+  existed but never became visible and the launcher spun at ~2 cores
+  (WebView2 under `pythonw`; the same code in a normal console loaded fine).
+  Root cause inside WebView2 initialisation was not isolated. pywebview only
+  logs that failure, and the windowless launcher had no log output. The
+  launcher now logs pywebview errors to `startup.log`, retries the load once
+  after 45 s, then opens JARVIS in the default browser. Not verified: that
+  this recovers the exact blank-window case on your PC (it is unit-tested with
+  fakes); the underlying cause may still need a WebView2 runtime repair.
+- **Voice cut mid-sentence.** The local "you started talking" detector counted
+  3 audio frames, but frames are 128 samples (~2.7 ms), so ~8 ms of noise or
+  JARVIS's own voice from the speakers interrupted replies (the log shows
+  barge-in repeated many times). It now needs ~350 ms of sustained speech and
+  ignores the first 500 ms of each reply. Headphones also help.
+- **Internet search always failed** (`BRAVE_API_KEY` missing). Falls back to
+  Gemini Google Search grounding with sources (real test passed).
+- **"Anti Gravity" window not found** ("Antigravity IDE"): window names now
+  match ignoring spaces and punctuation.
+- **Repeating reminders and quiet hours** added (`recordatorio_recurrente`,
+  `JARVIS_QUIET_HOURS`).
+
+Local model baseline (`scripts/benchmark_local_model.py`, qwen2.5:3b, Q4_K_M,
+1.93 GB, T500 4 GB, 2 runs x 10 tool prompts + 4 chats):
+cold load 30.7 s; first token 0.40 s; short reply 1.3 s; tool call 1.43 s;
+tool accuracy 17/20; invalid tool calls 0/20; 2.1 GB VRAM. Misses: "5 nimisham
+timer vai" (Thanglish) and a current-events question (no tool chosen, correct
+behaviour would be a web search).
+Candidates (sizes from ollama.com, not downloaded): `qwen3.5:4b` 3.3 GB,
+`qwen3.5:9b` 6.6 GB (too large for 4 GB VRAM, would run mostly on CPU),
+`qwen3:4b` 2.5 GB. Only `qwen3.5:4b` fits the T500 and is worth testing.
+It needs your approval to download (3.3 GB; 354 GB free). No other model was
+considered worthwhile without a measured benefit on this machine.
+
 ## Phases D–I
 
 Not started.

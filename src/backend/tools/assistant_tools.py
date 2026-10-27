@@ -43,7 +43,7 @@ def poner_temporizador(duracion: str, etiqueta: str = "Timer") -> str:
     if minutes is None or minutes <= 0 or minutes > 24 * 60:
         return "Give a duration like '5 min' or '90 seconds' (up to 24 hours)."
     label = str(etiqueta or "Timer").strip()[:80] or "Timer"
-    item = reminder_store.add(f"{label} done ({_human_minutes(minutes)})", minutes)
+    item = reminder_store.add(f"{label} done ({_human_minutes(minutes)})", minutes, kind="timer")
     return f"Timer set for {_human_minutes(minutes)}. Ends at {item['due'][11:16]}."
 
 
@@ -81,9 +81,29 @@ def poner_alarma(hora: str, etiqueta: str = "Alarm") -> str:
     if minutes is None:
         return "Give a time like '7:30', '6 am' or '18:45'."
     label = str(etiqueta or "Alarm").strip()[:80] or "Alarm"
-    item = reminder_store.add(f"{label} ({hora.strip()})", minutes)
+    item = reminder_store.add(f"{label} ({hora.strip()})", minutes, kind="alarm")
     day = "tomorrow" if item["due"][:10] != datetime.now().strftime("%Y-%m-%d") else "today"
     return f"Alarm set for {item['due'][11:16]} {day}."
+
+
+@tool
+def recordatorio_recurrente(texto: str, hora: str, repetir: str = "daily") -> str:
+    """Repeating reminder at a clock time. repetir: daily, weekdays (Mon-Fri) or weekly.
+    Example: 'remind me every day at 9 pm to take medicine', 'dhinamum 7 manikku walk pannanum-nu sollu'."""
+    from core.reminders import REPEATS, reminder_store
+
+    repeat = str(repetir or "daily").strip().lower()
+    repeat = {"every day": "daily", "everyday": "daily", "weekday": "weekdays", "week": "weekly"}.get(repeat, repeat)
+    if repeat not in REPEATS:
+        return "Repeat must be daily, weekdays or weekly."
+    minutes = minutes_until(hora)
+    if minutes is None:
+        return "Give a time like '7:30', '9 pm' or '18:45'."
+    text = str(texto or "").strip()
+    if not text:
+        return "Tell me what to remind you about."
+    item = reminder_store.add(text, minutes, repeat=repeat)
+    return f"Repeating reminder ({repeat}) set: '{text}'. Next: {item['due'][:10]} at {item['due'][11:16]}."
 
 
 # ── Notes ─────────────────────────────────────────────────────────

@@ -130,3 +130,8 @@ voice_profiles/
 .cache-*
 .spotify_cache
 .spotify_cache/
+
+# Personal voice recordings must never be committed
+WhatsApp Audio*
+jarvis-stt/
+*.m4a

@@ -98,6 +98,8 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     # Software: searching is read-only; installing always needs explicit approval.
     "leer_texto_pantalla": ToolPolicy("leer_texto_pantalla", "elevated", ("admin",), False, True),
     "leer_texto_imagen": ToolPolicy("leer_texto_imagen", "elevated", ("admin",), False, True),
+    "leer_correos_nuevos": ToolPolicy("leer_correos_nuevos", "elevated", ("admin",), True, True),
+    "enviar_correo": ToolPolicy("enviar_correo", "critical", ("admin",), True, True),
     "programar_rutina": ToolPolicy("programar_rutina", "elevated", ("admin",), False, True),
     "ver_rutinas": ToolPolicy("ver_rutinas", "elevated", ("admin",), False, True),
     "cancelar_rutina": ToolPolicy("cancelar_rutina", "elevated", ("admin",), False, True),

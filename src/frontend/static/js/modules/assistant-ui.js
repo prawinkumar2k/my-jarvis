@@ -6,7 +6,7 @@
  */
 
 const POLL_MS = 15000;
-const CATEGORIES = ['install', 'file_changes', 'delete', 'browser', 'desktop_control', 'clipboard', 'plans'];
+const CATEGORIES = ['install', 'file_changes', 'delete', 'browser', 'desktop_control', 'clipboard', 'plans', 'mail'];
 
 export function describeAiRoute(route, t = (k) => k) {
     if (!route || typeof route !== 'object') {

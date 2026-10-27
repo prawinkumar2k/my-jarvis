@@ -105,11 +105,11 @@ def test_a_check_that_crashes_is_a_warning_never_ok(monkeypatch):
 
 
 def test_summary_and_ready_flag(monkeypatch):
-    for name in ("_ai", "_ollama", "_microphone", "_speech_model", "_voice", "_wake_word", "_startup"):
+    for name in ("_ai", "_ollama", "_microphone", "_speech_model", "_voice", "_wake_word", "_mail", "_startup"):
         monkeypatch.setattr(setup_check, name, lambda n=name: setup_check._item(n, n, "ok", "fine"))
     monkeypatch.setattr(setup_check, "_tools", lambda: [setup_check._item("ffmpeg", "FFmpeg", "missing", "no", "winget install Gyan.FFmpeg")])
     result = setup_check.run_checks()
-    assert result["summary"] == {"ok": 7, "warn": 0, "missing": 1} and result["ready"] is False
+    assert result["summary"] == {"ok": 8, "warn": 0, "missing": 1} and result["ready"] is False
 
 
 def test_route_returns_the_report_and_refuses_hostile_origins(monkeypatch):

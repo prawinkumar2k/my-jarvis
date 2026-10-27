@@ -12,6 +12,8 @@ and FFmpeg. It is off in `local_only` mode (the text goes to Microsoft). Other v
 The service is unofficial; if it ever stops, JARVIS falls back to Piper by itself.
 
 ## 2. Telegram: free
+**If a bot token ever appears in a chat or screenshot, treat it as leaked:** in BotFather send `/revoke`, pick the bot, and use the new token (only in `.env`).
+
 1. In Telegram search `@BotFather`, send `/newbot`, choose a name, copy the token it gives you.
 2. Open your new bot, press Start and send "hi".
 3. In a browser open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`; find `"chat":{"id":123456789`.
@@ -26,15 +28,18 @@ The service is unofficial; if it ever stops, JARVIS falls back to Piper by itsel
 - **Premium (only if you have it):** create a free app at developer.spotify.com/dashboard, set the redirect
   to exactly `http://127.0.0.1:8888/callback`, and put `SPOTIPY_CLIENT_ID` / `SPOTIPY_CLIENT_SECRET` in `.env`.
 
-## 4. Gmail and Google Calendar: free
-Google Cloud has a free tier and these two APIs cost nothing at personal use. No card is needed.
-1. console.cloud.google.com, create a project (for example "jarvis").
-2. APIs and Services, Library: enable "Gmail API" and "Google Calendar API".
-3. OAuth consent screen: User type External, app name "JARVIS", add your own Gmail as a Test user.
-4. Credentials, Create credentials, OAuth client ID, type **Desktop app**, then Download JSON.
-5. Save that file as `C:\Users\prawi\Documents\jarvis-google-credentials.json` (anywhere outside the repo)
-   and tell me the path (not the contents). I will build read-only Gmail/Calendar on it; the first run opens
-   your browser once for you to sign in and allow. Sending mail or changing events will always ask you first.
+## 4. Gmail without Google Cloud (app password, free)
+JARVIS reads unread mail and sends mail over Gmail's normal IMAP/SMTP, so no Google Cloud project or OAuth
+client is needed.
+1. Turn on 2-Step Verification: myaccount.google.com, Security.
+2. Security, 2-Step Verification, App passwords: create one named "JARVIS" (16 letters).
+3. Put these in `.env` yourself (never paste them in a chat): `JARVIS_MAIL_ADDRESS=you@gmail.com`,
+   `JARVIS_MAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx`. Ports: IMAP `imap.gmail.com:993` (SSL), SMTP
+   `smtp.gmail.com:587` (STARTTLS); they are the defaults, change `JARVIS_MAIL_SMTP_PORT=465` for SSL.
+4. Restart JARVIS. Say "any new emails?" (reads unread mail read-only, nothing is marked as read) or
+   "send an email to ... saying ..." (JARVIS shows the exact message and recipient and asks every time).
+Email text is treated as untrusted quoted content, never as instructions. Google Calendar still needs the
+OAuth route (not built).
 
 ## 5. Tamil / Thanglish speech accuracy: record yourself
 Speech recognition accuracy can only be measured on your real voice. Record these on your normal mic:
@@ -50,3 +55,9 @@ Lines to read (mix of quiet room and with fan or music on):
 - Tamil (`ta`, kind `tamil`): "இப்போது நேரம் என்ன", "நாளைக்கு காலை ஏழு மணிக்கு அலாரம் வை", "என் பேட்டரி எவ்வளவு இருக்கு", "ஸ்பாட்டிஃபையில் ஒரு பாட்டு போடு"
 - Thanglish (`en`, kind `thanglish`): "jarvis ippo time enna", "naalaiku kaalai ezhu mani ku alarm vai", "en battery evlo irukku", "oru paatu podu"
 - English (`en`, kind `english`): "what time is it", "set a timer for five minutes", "open notepad", "what is the weather in Chennai"
+
+## Your first two recordings (checked 2026-10-27)
+`WhatsApp Audio ... 10.09.36 PM.mp4` (13 s) and `...10.09.37 PM.mp4` (15 s) are both **English** (Indian accent).
+The offline `small` model with automatic language detection (`JARVIS_STT_LANGUAGE=auto`) heard them clearly;
+forcing Tamil (`ta`) on English speech gives nonsense, which is expected. They are git-ignored (voice data is
+never committed). No Tamil or Thanglish sample exists yet, so Tamil accuracy is still unmeasured.

@@ -30,6 +30,8 @@ _LAZY_EXPORTS = {
     "recordatorio_recurrente": ("tools.assistant_tools", "recordatorio_recurrente"),
     "leer_texto_pantalla": ("tools.assistant_tools", "leer_texto_pantalla"),
     "leer_texto_imagen": ("tools.assistant_tools", "leer_texto_imagen"),
+    "leer_correos_nuevos": ("tools.assistant_tools", "leer_correos_nuevos"),
+    "enviar_correo": ("tools.assistant_tools", "enviar_correo"),
     "programar_rutina": ("tools.assistant_tools", "programar_rutina"),
     "ver_rutinas": ("tools.assistant_tools", "ver_rutinas"),
     "cancelar_rutina": ("tools.assistant_tools", "cancelar_rutina"),

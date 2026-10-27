@@ -111,6 +111,15 @@ def _tools() -> list[dict]:
     return items
 
 
+def _mail() -> dict:
+    from core import mail
+
+    if mail.configured():
+        return _item("mail", "Email (optional)", OK, "An address and app password are set (the password is never shown).")
+    return _item("mail", "Email (optional)", WARN, "Not set up, so JARVIS cannot read or send email.",
+                 "Add JARVIS_MAIL_ADDRESS and JARVIS_MAIL_APP_PASSWORD to .env (Google Account > Security > App passwords).")
+
+
 def _startup() -> dict:
     try:
         from core.startup_manager import get_startup_status
@@ -127,7 +136,7 @@ def _startup() -> dict:
 
 def run_checks() -> dict:
     checks: list[dict] = []
-    for build in (_ai, _ollama, _microphone, _speech_model, _voice, _wake_word, _startup):
+    for build in (_ai, _ollama, _microphone, _speech_model, _voice, _wake_word, _mail, _startup):
         try:
             checks.append(build())
         except Exception as exc:  # a broken check must not look like a pass

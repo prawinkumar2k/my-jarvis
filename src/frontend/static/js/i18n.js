@@ -193,6 +193,7 @@ export const translations = {
         "cat_delete": "deleting files",
         "cat_browser": "browser actions",
         "cat_desktop_control": "mouse and keyboard control",
+        "cat_mail": "reading your email",
         "cat_clipboard": "reading the clipboard",        "cat_plans": "running saved plans",
         "tasks_title": "TASKS",
         "tasks_empty": "No tasks yet.",

@@ -59,7 +59,7 @@ class Resolution:
 
 
 # Categories the user can force back to "ask every time" in the automation settings.
-USER_CATEGORIES = ("install", "file_changes", "delete", "browser", "desktop_control", "clipboard", "plans")
+USER_CATEGORIES = ("install", "file_changes", "delete", "browser", "desktop_control", "clipboard", "plans", "mail")
 DEFAULT_PREFS: dict[str, Any] = {"auto_low_risk": True, "ask_once_per_task": True, "always_confirm": [],
                                  "voice_autostart": True,  # listen as soon as JARVIS opens (needs the mic already allowed)
                                  "ask_before_screen_upload": False}  # ask each time a screenshot would go to the cloud AI
@@ -164,6 +164,10 @@ def _rule(tool: str, args: dict) -> Classification | None:
     text = " ".join(str(v) for v in args.values())[:300]
     if tool == "leer_archivo":
         return Classification(Tier.AUTO, "read_file", reason="reads a file inside the allowed folders")
+    if tool == "leer_correos_nuevos":  # sending is never listed here, so it always asks (EXPLICIT)
+        if _local_only():
+            return Classification(Tier.AUTO, "mail", reason="mail text stays on this PC (local-only mode)")
+        return Classification(Tier.TASK, "mail", "*", 1800, "email text may be sent to the cloud AI to answer you")
     if tool == "leer_portapapeles":
         if _local_only():
             return Classification(Tier.AUTO, "clipboard", reason="clipboard text stays on this PC (local-only mode)")

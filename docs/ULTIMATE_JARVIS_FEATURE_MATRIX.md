@@ -118,7 +118,8 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Gmail, Google Calendar | BLOCKED | Free: needs your Google OAuth client JSON path and one sign-in (docs/FREE_SETUP_GUIDE.md) |
+| Gmail read (unread, read-only) and send (asks every time) via app password | VERIFIED (unit, fake servers) / UNVERIFIED on a real mailbox | Needs JARVIS_MAIL_ADDRESS + app password in .env; mail text is untrusted |
+| Google Calendar | BLOCKED | Needs a Google OAuth client JSON (see docs/FREE_SETUP_GUIDE.md); not built |
 | Spotify control | VERIFIED desktop route / BLOCKED web API | Desktop app control needs no credentials; the web API needs Premium |
 | Telegram | BLOCKED | Free: needs your bot token from @BotFather (see docs/FREE_SETUP_GUIDE.md) |
 | Coding agent | MISSING | |

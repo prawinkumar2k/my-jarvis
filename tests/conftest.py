@@ -34,6 +34,7 @@ os.environ["JARVIS_SKIP_DOTENV"] = "1"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["GOOGLE_API_KEY"] = ""
 os.environ["JARVIS_TEST_MODE"] = "1"
+os.environ["JARVIS_TTS_PROVIDER"] = "piper"  # tests never send text to a cloud voice; test_edge_voice.py opts in
 os.environ["JARVIS_AUTOCURACION"] = "false"
 # Tests must never inherit the developer's real API credential from the shell
 # or .env. Individual auth tests opt in with a known monkeypatched token.

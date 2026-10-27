@@ -627,18 +627,29 @@ def leer_archivo(nombre_archivo: str) -> str:
         bloqueo = _bloqueo_si_no_autorizado()
         if bloqueo:
             return bloqueo
+        # Reading is automatic (no confirmation), so it is confined to the allowed folders and never
+        # opens protected files (.env, keys, credentials), however the path is written.
+        from tools.files import _resolve_target
+
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         rutas_candidatas = [
             nombre_archivo,
             os.path.join(desktop, nombre_archivo),
             os.path.join(desktop, nombre_archivo + ".txt"),
         ]
+        refused = ""
         for ruta in rutas_candidatas:
-            if os.path.exists(ruta):
-                with open(ruta, encoding="utf-8", errors="ignore") as f:
+            path, error = _resolve_target(ruta, must_exist=False, allow_root=False)
+            if path is None:
+                refused = refused or error
+                continue
+            if path.is_file():
+                with open(path, encoding="utf-8", errors="ignore") as f:
                     contenido = f.read(3000)
-                print(f"  [FILE] Read: {ruta}")
+                print(f"  [FILE] Read: {path.name}")
                 return f"Contenido de '{nombre_archivo}':\n{contenido}"
+        if refused:
+            return refused
         return f"No encontré el archivo '{nombre_archivo}' en el escritorio."
     except Exception as e:
         return f"Error leyendo archivo: {e}"
@@ -673,6 +684,10 @@ def analizar_pantalla() -> str:
         bloqueo = _bloqueo_si_no_autorizado()
         if bloqueo:
             return bloqueo
+        from core.cloud_policy import LOCAL_ONLY_MESSAGE, cloud_ai_allowed
+
+        if not cloud_ai_allowed():  # describing the screen needs a cloud vision model: do not even capture it
+            return f"{LOCAL_ONLY_MESSAGE} I did not capture your screen; no local vision model is installed."
         # Optional desktop dependencies must not be required for headless/core mode.
         import pyautogui  # noqa: PLC0415
         from PIL import Image, ImageFilter, ImageStat  # noqa: PLC0415

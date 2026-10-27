@@ -115,15 +115,35 @@ def _invoke_with_fallback(model, messages: list, *, event: str):
     automatic retries, so a quota error never loops.
     """
     try:
-        return model.invoke(messages)
+        response = model.invoke(messages)
     except Exception as exc:
         obs_event(event, error=type(exc).__name__)
         fallback = brain_state.llm_fallback
         if fallback is None or fallback is model:
             raise LLMServiceError from None
+    else:
+        _note_answer(model, "primary")
+        return response
     response = _invoke_model(fallback, messages, event="llm_fallback_invoke_failed")
     obs_event("llm_fallback_succeeded", stage=event)
+    _note_answer(fallback, "fallback")
     return response
+
+
+def _note_answer(model, role: str) -> None:
+    """Remember which provider/model answered (for the UI). Never raises."""
+    try:
+        name = str(getattr(model, "last_model", "") or getattr(model, "model_name", "") or getattr(model, "model", "") or "")
+        lowered = name.lower()
+        if lowered.startswith("gemini"):
+            provider = "gemini"
+        elif role == "primary":
+            provider = brain_state.llm_primary_provider
+        else:
+            provider = "ollama" if ":" in name else brain_state.llm_fallback_provider
+        brain_state.last_answer = {"provider": provider or "", "model": name, "role": role, "at": int(_time.time())}
+    except Exception:
+        pass
 
 
 def _stream_with_fallback(messages: list):
@@ -286,6 +306,19 @@ def _resolve_pending_spotify_selection(
     return str(result), False
 
 
+def _resolve_waiting_task_reply(user_input: str) -> tuple[str | None, bool]:
+    """"okay" / "seri" / "no" answers a task that is paused for approval, but only when exactly one
+    task is waiting and it paused recently; with several waiting, nothing is guessed."""
+    from core import task_engine
+    from core.security.approval_language import interpret_reply
+
+    verdict = interpret_reply(reparar_unicode(str(user_input or "")))
+    if verdict == "unclear":
+        return None, False
+    reply = task_engine.answer_waiting_task(verdict)
+    return (reply, False) if reply else (None, False)
+
+
 def _resolve_pending_auth_confirmation(
     user_input: str,
     profile_id: str,
@@ -293,42 +326,24 @@ def _resolve_pending_auth_confirmation(
     pid = str(profile_id or DEFAULT_PROFILE_ID).strip().lower() or DEFAULT_PROFILE_ID
     pending = history_manager._extraer_accion_pendiente_auth(pid, pop=False)
     if pending is None:
-        return None, False
+        return _resolve_waiting_task_reply(user_input)
 
-    normalized = reparar_unicode(str(user_input or "")).strip().lower()
-    normalized = re.sub(r"[^\w\s]", " ", normalized)
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    from core.security.approval_language import interpret_reply
 
-    affirmative = {
-        "si", "sí", "yes", "yeah", "yep", "claro", "por supuesto",
-        "adelante", "hazlo", "proceder", "procede", "confirmo",
-        "confirmar", "autorizo", "autorizar", "ejecutar", "ejecuta",
-        "si hazlo", "sí hazlo", "si procede", "sí procede", "dale",
-        "de acuerdo", "ok", "okay", "afirmativo", "correcto", "autorizado",
-    }
-    cancellation = {
-        "no", "cancela", "cancelar", "abortar", "aborta", "no lo hagas",
-        "detener", "deten", "para", "negativo", "rechazar",
-    }
-
-    tokens = set(normalized.split())
-    is_cancellation = (
-        normalized in cancellation
-        or bool(tokens & {"cancela", "cancelar", "abortar", "aborta", "detener", "rechazar"})
-        or normalized == "no"
-        or normalized.startswith(("no ", "cancela", "cancelar", "abortar", "no quiero", "no lo hagas"))
-    )
-    if is_cancellation:
+    # The whole reply must be an answer ("ok", "seri pannu", "no", "vendaam"). "yes but don't ..." is a
+    # refusal and "yes and open Chrome" is a new request, never permission.
+    verdict = interpret_reply(reparar_unicode(str(user_input or "")))
+    if verdict == "reject":
         history_manager._extraer_accion_pendiente_auth(pid, pop=True)
         english = not get_current_language().startswith("es")
         return ("Action cancelled." if english else "Acción cancelada."), False
+    if verdict != "approve":
+        # The user moved on. Drop the old question so a later "okay" cannot approve
+        # something they are no longer looking at.
+        history_manager._extraer_accion_pendiente_auth(pid, pop=True)
+        return None, False
 
-    is_affirmative = (
-        normalized in affirmative
-        or bool(tokens & {"si", "sí", "yes", "adelante", "confirmo", "autorizo", "procede", "proceder", "hazlo", "afirmativo"})
-        or normalized.startswith(("si ", "sí ", "yes ", "adelante", "hazlo", "confirmo", "autorizo", "dale", "procede"))
-    )
-    if is_affirmative:
+    if verdict == "approve":
         action = history_manager._extraer_accion_pendiente_auth(pid, pop=True)
         if not action:
             return None, False

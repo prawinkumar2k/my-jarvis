@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from core import jarvis_config
 from core.jarvis_context import context
 from core.security import emergency_stop
+from core.security.approval_policy import resolve as resolve_approval
 from core.security.tool_policy import evaluate_tool_policy, export_tool_policy_table
 
 # DEPENDENCY INJECTION
@@ -376,14 +377,33 @@ def _security_guard(
     else:
         authorized = False
     # Confirmation is transport state, never a model-controlled tool argument.
-    confirmed = str(source or "").lower() in {"control_panel", "auth_resume"}
+    source_name = str(source or "").lower()
+    confirmed = source_name in {"control_panel", "auth_resume", "task_approved"}
+    # Risk tier: harmless actions run, one approval can cover a whole task, dangerous ones always ask.
+    # Only a fresh user "yes" (not an already-approved task step) may create a time-limited scope.
+    resolution = resolve_approval(
+        tool_name,
+        args,
+        confirmed=confirmed,
+        remember=source_name in {"control_panel", "auth_resume"},
+        overrides=policy.get("tool_policies") or {},
+    )
     decision = evaluate_tool_policy(
         tool_name,
         profile_id=profile_id,
         authorized=authorized,
-        confirmed=confirmed,
+        confirmed=resolution.effective_confirmed,
         overrides=policy.get("tool_policies") or {},
     )
+    if decision.allowed and decision.policy.requires_confirmation and (resolution.grant_used or resolution.grant_created):
+        _security_audit(
+            "approval_scope_used" if resolution.grant_used else "approval_scope_granted",
+            level="info",
+            tool=tool_name,
+            reason=resolution.reason,
+            source=source,
+            metadata={"category": resolution.category, "tier": int(resolution.tier)},
+        )
     if not decision.allowed:
         if callable(_obs_inc):
             _obs_inc("security_warning_total", 1)

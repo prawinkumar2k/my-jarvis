@@ -295,10 +295,11 @@ def _blocked_error(reason: str, tool_name: str = "", args: dict | None = None) -
     if "authoriz" in normalized_reason or "autoriz" in normalized_reason:
         return ToolAuthorizationRequiredError(public_reason)
     if "confirm" in normalized_reason:
+        from core.security.approval_policy import scope_note
         from core.security.confirmation_preview import preview
 
         details = preview(tool_name, args or {})
-        return ToolConfirmationRequiredError(f"{public_reason} {details}".strip())
+        return ToolConfirmationRequiredError(f"{public_reason} {details} {scope_note(tool_name, args or {})}".strip())
     return ToolPolicyBlockedError(public_reason)
 
 

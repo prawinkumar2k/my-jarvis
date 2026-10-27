@@ -25,6 +25,8 @@ llm_fallback: Any = None
 llm_with_tools: Any = None
 llm_primary_provider = ""
 llm_fallback_provider = ""
+# Which provider/model actually answered the most recent request (shown in the UI).
+last_answer: dict[str, Any] = {}
 
 # Tool Registry
 tools_list: list = []

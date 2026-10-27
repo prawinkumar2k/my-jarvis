@@ -304,6 +304,74 @@ async def wakeword():
     return jsonify(wake_word_listener.status(since))
 
 
+@security_bp.route("/api/security/ai-route", methods=["GET"])
+async def ai_route():
+    """Which AI JARVIS will use, in what order, and which one answered last. No keys, no prompts."""
+    import os
+
+    from core.brain import brain_state
+    from core.llm_providers import gemini_backup_model, resolve_llm_provider_config
+
+    config = resolve_llm_provider_config()
+    chain = []
+    if config.primary_provider:
+        chain.append({"role": "primary", "provider": config.primary_provider, "model": config.primary_model})
+        backup = gemini_backup_model(config)
+        if backup:
+            chain.append({"role": "backup", "provider": "gemini", "model": backup})
+    if config.fallback_provider:
+        chain.append({"role": "fallback", "provider": config.fallback_provider, "model": config.fallback_model})
+    for provider, model, _key in config.extra_fallbacks:
+        chain.append({"role": "fallback", "provider": provider, "model": model})
+    return jsonify({
+        "mode": config.mode,
+        "local_only": config.mode == "local_only",
+        "configured": config.configured,
+        "ready": brain_state.llm is not None,
+        "chain": chain,
+        "last_answer": dict(brain_state.last_answer or {}),
+        "speech_to_text": {
+            "where": "local (this PC)",
+            "model": os.getenv("JARVIS_WHISPER_MODEL") or "default",
+        },
+    })
+
+
+@security_bp.route("/api/security/automation", methods=["GET", "POST"])
+async def automation_preferences():
+    """How much JARVIS may do without asking. GET shows preferences and the approvals currently
+    active; POST {"auto_low_risk", "ask_once_per_task", "always_confirm": [...]} saves them (all
+    active approvals are cleared so the new rules start clean)."""
+    from core.security import approval_policy
+
+    if request.method == "POST":
+        data = await request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Send a JSON object."}), 400
+        for flag in ("auto_low_risk", "ask_once_per_task", "voice_autostart"):
+            if flag in data and not isinstance(data[flag], bool):
+                return jsonify({"error": f"Field '{flag}' must be true or false."}), 400
+        forced = data.get("always_confirm", [])
+        if not isinstance(forced, list) or any(c not in approval_policy.USER_CATEGORIES for c in forced):
+            return jsonify({"error": "always_confirm must list known categories.",
+                            "categories": list(approval_policy.USER_CATEGORIES)}), 400
+        current = approval_policy.load_prefs()
+        await asyncio.to_thread(approval_policy.save_prefs, {**current, **data})
+    return jsonify({
+        "preferences": approval_policy.load_prefs(),
+        "categories": list(approval_policy.USER_CATEGORIES),
+        "active_approvals": approval_policy.grants.snapshot(),
+    })
+
+
+@security_bp.route("/api/security/automation/revoke", methods=["POST"])
+async def revoke_automation_approvals():
+    """Forget every approval that is currently remembered (they also expire and end at STOP)."""
+    from core.security import approval_policy
+
+    return jsonify({"revoked": approval_policy.grants.revoke_all()})
+
+
 @security_bp.route("/api/security/diagnostics", methods=["GET"])
 async def system_diagnostics():
     """Live readings for the control panel; unavailable values are null, never 0."""

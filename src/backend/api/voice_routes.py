@@ -412,11 +412,21 @@ async def live_voice_stream():
     import json
     import uuid
 
+    from core.cloud_policy import LOCAL_ONLY_MESSAGE, cloud_ai_allowed
     from quart import websocket
     from voice.live_gemini import GeminiLiveStreamer
     from voice.live_hybrid import HybridLiveStreamer
     from voice.live_session import live_session_manager
     from voice.live_transport import LiveTransportError
+
+    if not cloud_ai_allowed():
+        # Gemini Live streams the microphone to Google; refuse before any audio is opened.
+        await websocket.send(json.dumps({
+            "type": "error",
+            "code": "local_only",
+            "message": f"{LOCAL_ONLY_MESSAGE} Use the offline wake word and local speech instead.",
+        }))
+        return
 
     session_id = str(uuid.uuid4())
     language = websocket.args.get("lang", "en")

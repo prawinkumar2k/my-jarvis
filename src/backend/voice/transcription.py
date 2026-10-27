@@ -56,7 +56,10 @@ class GroqAudioTranscriber:
 
     @property
     def configured(self) -> bool:
-        return bool(self._api_key or self._client is not None)
+        from core.cloud_policy import cloud_ai_allowed
+
+        # Cloud transcription uploads the recording: never in local-only mode.
+        return cloud_ai_allowed() and bool(self._api_key or self._client is not None)
 
     def _get_client(self):
         with self._lock:

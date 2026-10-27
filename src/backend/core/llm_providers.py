@@ -59,7 +59,7 @@ def resolve_llm_provider_config(
     if requested not in {"", "gemini", "groq", "ollama"}:
         requested = ""
     mode = str(source.get("JARVIS_AI_MODE") or "cloud_first").strip().lower()
-    if mode not in {"cloud_first", "local_first", "local_only"}:
+    if mode not in {"cloud_first", "local_first", "local_only", "manual"}:
         mode = "cloud_first"
     local_model = str(source.get("OLLAMA_MODEL") or "").strip()
     local = ("ollama", local_model, "ollama") if local_model else ("", "", "")
@@ -112,6 +112,16 @@ def resolve_llm_provider_config(
             primary = local
     elif mode == "local_only":
         primary, fallback = ("", "", ""), ("", "", "")
+    if mode == "manual":
+        # The user pinned exactly one provider (JARVIS_LLM_PROVIDER): no fallbacks, no hidden second model.
+        # If that provider is not usable the result is "not configured", never a silent switch.
+        choices = {
+            "gemini": ("gemini", gemini_model, gemini_key) if gemini_key else ("", "", ""),
+            "groq": ("groq", groq_model, groq_key) if groq_key else ("", "", ""),
+            "ollama": local,
+        }
+        primary = choices.get(requested, ("", "", ""))
+        fallback, extras = ("", "", ""), ()
     return LLMProviderConfig(
         primary_provider=primary[0],
         primary_model=primary[1],
@@ -129,7 +139,7 @@ def gemini_backup_model(config: LLMProviderConfig, env: Mapping[str, str] | None
 
     JARVIS_GEMINI_BACKUP_MODEL=none disables it.
     """
-    if config.primary_provider != "gemini":
+    if config.primary_provider != "gemini" or config.mode == "manual":
         return ""
     source = os.environ if env is None else env
     model = str(source.get("JARVIS_GEMINI_BACKUP_MODEL") or _DEFAULT_GEMINI_BACKUP_MODEL).strip()

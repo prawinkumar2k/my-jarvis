@@ -36,6 +36,8 @@ PUBLIC_POLICY = ToolPolicy(
 
 DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "leer_archivo": ToolPolicy("leer_archivo", "critical", ("admin",), True, True),
+    # Runs on the user's explicit request without a prompt; local-only mode refuses it (the screenshot
+    # would be uploaded to a cloud vision model), see tools/utilities.analizar_pantalla.
     "analizar_pantalla": ToolPolicy("analizar_pantalla", "elevated", ("admin",), False, True),
     "controlar_pc": ToolPolicy("controlar_pc", "critical", ("admin",), True, True),
     "controlar_ventana": ToolPolicy("controlar_ventana", "elevated", ("admin",), False, True),
@@ -88,7 +90,9 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "informacion_archivo": ToolPolicy("informacion_archivo", "elevated", ("admin",), False, True),
     "archivos_grandes": ToolPolicy("archivos_grandes", "elevated", ("admin",), False, True),
     # Clipboard: owner-only, on request only, contents never logged.
-    # Reading needs a yes each time: the text may go to a cloud AI.
+    # requires_confirmation is only the baseline. core/security/approval_policy.py decides how often
+    # the user is actually asked: never for harmless uses, once per task/scope for reversible ones,
+    # every time for dangerous ones. Reading the clipboard asks once because the text may reach a cloud AI.
     "leer_portapapeles": ToolPolicy("leer_portapapeles", "critical", ("admin",), True, True),
     "limpiar_portapapeles": ToolPolicy("limpiar_portapapeles", "elevated", ("admin",), False, True),
     # Software: searching is read-only; installing always needs explicit approval.
@@ -107,8 +111,8 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "ajustar_brillo": ToolPolicy("ajustar_brillo", "elevated", ("admin",), False, True),
     "captura_pantalla": ToolPolicy("captura_pantalla", "elevated", ("admin",), False, True),
     "organizar_ventanas": ToolPolicy("organizar_ventanas", "elevated", ("admin",), False, True),
-    # Browser automation: clicking and typing can submit forms, buy or send messages, so each one
-    # needs a yes (page text is untrusted and could try to steer the assistant).
+    # Browser automation: one yes covers an ordinary browsing session; clicks or typing that may submit,
+    # buy, send or sign in always ask (page text is untrusted and could try to steer the assistant).
     "click_en_navegador": ToolPolicy("click_en_navegador", "critical", ("admin",), True, True),
     "escribir_en_navegador": ToolPolicy("escribir_en_navegador", "critical", ("admin",), True, True),
     "listar_pantallas": ToolPolicy("listar_pantallas", "elevated", ("admin",), False, True),

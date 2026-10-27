@@ -56,6 +56,10 @@ def pcm_to_wav(pcm: bytes, sample_rate: int = SAMPLE_RATE) -> bytes:
 
 def synthesize(text: str) -> bytes:
     """Return WAV bytes for `text`, or raise GeminiTTSError."""
+    from core.cloud_policy import cloud_ai_allowed
+
+    if not cloud_ai_allowed():  # the text would leave the PC; the local voice is used instead
+        raise GeminiTTSError("local_only")
     key = resolve_gemini_api_key()
     if not key:
         raise GeminiTTSError("no_key")

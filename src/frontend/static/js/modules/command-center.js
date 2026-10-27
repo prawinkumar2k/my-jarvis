@@ -17,7 +17,13 @@ const STATE_KEYS = Object.freeze({
 
 export function normalizeCommandText(value, maxLength = MAX_COMMAND_LENGTH) {
     const limit = Math.max(1, Number(maxLength) || MAX_COMMAND_LENGTH);
-    return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
+    // Collapse runs of spaces but keep deliberate line breaks (Shift+Enter).
+    return String(value ?? '')
+        .replace(/[^\S\n]+/g, ' ')
+        .replace(/ ?\n ?/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+        .slice(0, limit);
 }
 
 export function commandStateView(state, translate) {

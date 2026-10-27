@@ -16,6 +16,7 @@ import {
 import { classifyVoiceApiFailure } from './modules/voice-api.js';
 import { audioConstraints, setPreferredMicName } from './modules/mic-preference.js';
 import { renderTasks } from './modules/task-panel.js';
+import { initAssistantUi } from './modules/assistant-ui.js';
 import {
     LiveVoiceClient,
     liveVoiceErrorView,
@@ -61,6 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
         transcriptText: document.getElementById('transcript'),
         commandForm: document.getElementById('command-form'),
         commandInput: document.getElementById('command-input'),
+        commandNotice: document.getElementById('command-notice'),
+        commandFailed: document.getElementById('command-failed'),
+        commandFailedText: document.getElementById('command-failed-text'),
+        commandRetryText: document.getElementById('command-retry-text'),
         commandSubmit: document.getElementById('command-submit'),
         commandStatus: document.getElementById('command-status'),
         commandRecovery: document.getElementById('command-recovery'),
@@ -492,14 +497,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     dom.loader.classList.add('hidden');
                     dom.app.classList.remove('hidden');
+                    dom.commandInput?.focus();
                     const greetings = t('boot_greetings');
                     speakBootBriefing(
                         greetings[Math.floor(Math.random() * greetings.length)],
                         () => {
                             loadNewsBackground();
                             setCommandState('idle');
+                            autoStartVoiceOnce();
                         }
                     );
+                    // If the spoken greeting hangs (audio problem), voice still starts shortly after.
+                    setTimeout(autoStartVoiceOnce, 25000);
                     ui.addLogEntry(t('boot_protocols'));
                     window.addEventListener('resize', () => reactor.resize(), { passive: true });
                     reactor.resize();
@@ -975,7 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.commandStatus.dataset.state = view.state;
         }
         if (dom.commandSubmit) {
-            dom.commandSubmit.disabled = view.busy;
+            dom.commandSubmit.disabled = view.busy && !textCommandInFlight;
         }
         if (dom.commandInput) {
             dom.commandInput.setAttribute('aria-busy', String(view.busy));
@@ -983,17 +992,112 @@ document.addEventListener('DOMContentLoaded', () => {
         reactor.setState(view.state);
     }
 
+    // ── Message composer: send / stop / retry ─────────────────────────────
+    let assistantUi = null;        // status bar, approval card, automation settings (see modules/assistant-ui.js)
+    let activeCommand = null;      // { controller, cancelled, tick } while a text command runs
+    let lastFailedText = '';
+
+    function setCommandNotice(message) {
+        if (dom.commandNotice) dom.commandNotice.textContent = message || '';
+    }
+
+    function fitComposer() {
+        const box = dom.commandInput;
+        if (!box) return;
+        box.style.height = 'auto';
+        box.style.height = `${Math.min(box.scrollHeight, 150)}px`;
+    }
+
+    function renderSendButton(stopping) {
+        const button = dom.commandSubmit;
+        if (!button) return;
+        const key = stopping ? 'command_stop' : 'command_send';
+        button.dataset.mode = stopping ? 'stop' : 'send';
+        button.setAttribute('aria-label', t(key));
+        button.setAttribute('data-i18n-aria-label', key);
+        const label = button.querySelector('.composer-label');
+        if (label) {
+            label.setAttribute('data-i18n', key);
+            label.textContent = t(stopping ? 'command_stop' : 'command_send_short');
+        }
+    }
+
+    function showCommandFailure(message) {
+        if (dom.commandFailedText) dom.commandFailedText.textContent = message || '';
+        dom.commandFailed?.classList.remove('hidden');
+    }
+
+    function hideCommandFailure() {
+        dom.commandFailed?.classList.add('hidden');
+        if (dom.commandFailedText) dom.commandFailedText.textContent = '';
+    }
+
+    function startCommandProgress(command) {
+        const started = Date.now();
+        command.tick = setInterval(() => {
+            const seconds = Math.floor((Date.now() - started) / 1000);
+            if (dom.commandStatus && textCommandInFlight) {
+                dom.commandStatus.textContent = `${commandStateView('processing', t).label} · ${seconds} s`;
+            }
+            if (seconds === 20) setCommandNotice(t('command_hint_long'));
+        }, 1000);
+    }
+
+    // Cancels the running text command. Returns true when something was cancelled.
+    function cancelActiveCommand() {
+        if (!activeCommand || activeCommand.cancelled) return false;
+        activeCommand.cancelled = true;
+        try { activeCommand.controller.abort(new Error('user_cancelled')); } catch (_) { }
+        return true;
+    }
+
     async function submitTextCommand(rawText) {
         const text = normalizeCommandText(rawText);
-        if (!text || textCommandInFlight) return false;
+        if (!text) return false;
+        if (textCommandInFlight) {
+            // Never silent: say why nothing was sent. The typed text stays in the box.
+            setCommandNotice(t('command_busy_notice'));
+            return false;
+        }
         let outcomeReported = false;
         let failureReply = '';
         textCommandInFlight = true;
+        activeCommand = { controller: new AbortController(), cancelled: false, tick: null };
+        const command = activeCommand;
+        lastFailedText = text;
+        hideCommandFailure();
+        setCommandNotice('');
+        // Clear the box now (like a chat app) so the next message can be typed while this one runs;
+        // the text is restored if the command fails or is cancelled.
+        if (dom.commandInput) dom.commandInput.value = '';
+        fitComposer();
+        renderSendButton(true);
         ui.addConversationSegment('user', text);
         ui.updateAssistantSegment(t('command_state_processing'));
         setCommandState('processing');
+        startCommandProgress(command);
         try {
             const data = await getLlamaResponses(text);
+            clearInterval(command.tick);
+            if (command.cancelled || data?.cancelled) {
+                ui.updateAssistantSegment(t('command_cancelled'));
+                setCommandNotice(t('command_cancelled'));
+                setCommandState('idle');
+                restoreComposerText(text);
+                return false;
+            }
+            if (data?.awaiting_approval || (Array.isArray(data?.receipts)
+                && data.receipts.some((receipt) => receipt?.diagnostic_code === 'tool_confirmation_required'))) {
+                // JARVIS asked "may I?": show it as an ordinary assistant message and let the user answer
+                // yes / seri / no. Nothing failed, so no error banner and the request is not put back in the box.
+                const question = sanitizeJarvisReply(widgets.processResponse(data?.response || ''));
+                setTranscript(question);
+                ui.updateAssistantSegment(question);
+                setCommandNotice(t('approval_voice_hint'));
+                setCommandState('confirmation');
+                lastFailedText = '';
+                return true;
+            }
             const successful = data?.ok === false
                 ? false
                 : isSuccessfulCommandOutcome(data?.outcome);
@@ -1010,22 +1114,41 @@ document.addEventListener('DOMContentLoaded', () => {
             setTranscript(reply);
             ui.updateAssistantSegment(reply);
             setCommandState('success');
-            if (dom.commandInput) dom.commandInput.value = '';
+            lastFailedText = '';
             return true;
         } catch {
+            clearInterval(command.tick);
             if (!outcomeReported) {
                 window.dispatchEvent(new CustomEvent('jarvis:command-outcome', {
                     detail: { outcome: '', ok: false }
                 }));
             }
-            ui.updateAssistantSegment(failureReply || t('command_state_error'));
+            const message = failureReply || t('command_state_error');
+            ui.updateAssistantSegment(message);
             if (failureReply) setTranscript(failureReply);
             setCommandState('error');
+            showCommandFailure(message);
+            restoreComposerText(text);
             return false;
         } finally {
+            clearInterval(command.tick);
             textCommandInFlight = false;
+            activeCommand = null;
+            renderSendButton(false);
             if (dom.commandSubmit) dom.commandSubmit.disabled = false;
-            if (dom.commandInput) dom.commandInput.setAttribute('aria-busy', 'false');
+            if (dom.commandInput) {
+                dom.commandInput.setAttribute('aria-busy', 'false');
+                const active = document.activeElement;
+                if (!active || active === document.body || active === dom.commandSubmit) dom.commandInput.focus();
+            }
+        }
+    }
+
+    // After a failure or cancel: give the text back, unless the user already typed something new.
+    function restoreComposerText(text) {
+        if (dom.commandInput && !dom.commandInput.value.trim()) {
+            dom.commandInput.value = text;
+            fitComposer();
         }
     }
 
@@ -1067,6 +1190,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dom.commandForm) {
         dom.commandForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            // While a command runs the button is STOP; otherwise it sends.
+            if (textCommandInFlight) {
+                cancelActiveCommand();
+                return;
+            }
             if (dom.commandInput) {
                 submitTextCommand(dom.commandInput.value);
             }
@@ -1075,12 +1203,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (dom.commandInput) {
         dom.commandInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitTextCommand(dom.commandInput.value);
-            }
+            // Enter sends; Shift+Enter is a new line; Enter that accepts an IME word (Tamil, CJK) is not a send.
+            if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            submitTextCommand(dom.commandInput.value);
+        });
+        dom.commandInput.addEventListener('input', () => {
+            fitComposer();
+            if (dom.commandNotice?.textContent) setCommandNotice('');
         });
     }
+
+    dom.commandRetryText?.addEventListener('click', () => {
+        const text = lastFailedText || dom.commandInput?.value || '';
+        hideCommandFailure();
+        submitTextCommand(text);
+    });
+
+    // Typing anywhere (with nothing focused) goes to the composer instead of vanishing.
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.altKey || e.metaKey || e.key.length !== 1 || !dom.commandInput) return;
+        if (dom.app?.classList.contains('hidden')) return;
+        const active = document.activeElement;
+        const editable = active && (active.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(active.tagName));
+        if (!editable) dom.commandInput.focus();
+    });
 
     if (dom.modeActionsToggle && dom.modeActions) {
         dom.modeActionsToggle.addEventListener('click', () => {
@@ -1268,6 +1415,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Voice is on from the moment JARVIS opens (setting "voice_autostart", on by default), the same as
+    // pressing Activate voice. It never triggers a microphone permission prompt by itself: it starts only
+    // when the microphone was already allowed; otherwise it says what to do once.
+    let voiceAutoStarted = false;
+    function autoStartVoiceOnce() {
+        if (voiceAutoStarted) return;
+        voiceAutoStarted = true;
+        autoStartVoice();
+    }
+
+    async function autoStartVoice() {
+        try {
+            const res = await fetch('/api/security/automation', { cache: 'no-store' });
+            const prefs = res.ok ? await res.json() : null;
+            if (prefs?.preferences?.voice_autostart === false) return;
+            if (emergencyStopEngaged || isLiveVoiceActive || liveVoiceStartInFlight) return;
+            if (currentMode === 'active' || currentMode === 'processing') return;
+            const capabilities = refreshVoiceCapabilities();
+            if (!capabilities.secureContext || !capabilities.hasGetUserMedia) return;
+            let allowed = false;
+            try {
+                allowed = (await navigator.permissions.query({ name: 'microphone' })).state === 'granted';
+            } catch (_) { allowed = false; }
+            if (!allowed) {
+                setCommandNotice(t('voice_autostart_blocked'));
+                return;
+            }
+            const route = await fetch('/api/security/ai-route', { cache: 'no-store' })
+                .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+            if (liveVoicePreferred && !route?.local_only) startLiveVoiceStream();
+            else startPassiveListening();
+        } catch (err) {
+            ui.addLogEntry(`> VOICE: ${err?.message || 'autostart failed'}`);
+        }
+    }
 
     // --- LIVE FULL-DUPLEX VOZ ---
     let liveVoiceClient = null;
@@ -2105,7 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function getLlamaResponseClassic(text) {
         const started = performance.now();
-        const data = await API.postChat(text, lastIdentifiedProfileId || 'web_default');
+        const data = await API.postChat(text, lastIdentifiedProfileId || 'web_default', activeCommand?.controller.signal);
         const totalNetworkMs = performance.now() - started;
         if (data?.metrics) {
             const metrics = data.metrics;
@@ -2132,6 +2315,9 @@ document.addEventListener('DOMContentLoaded', () => {
             addLogEntry(t('cog_classic'));
             try { return await getLlamaResponseClassic(userInput); }
             catch (e) {
+                if (activeCommand?.cancelled) {
+                    return { ok: false, cancelled: true, outcome: 'cancelled', response: '', should_listen: false };
+                }
                 addLogEntry(t('cog_error').replace('{detail}', e?.message || '---'));
                 return {
                     ok: false,
@@ -2143,7 +2329,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         addLogEntry(t('cog_connecting'));
         ui.updateAssistantSegment(t('cog_connecting').replace(/^>\s*/, ''));
-        const controller = new AbortController();
+        const controller = activeCommand?.controller || new AbortController();
+        let streamStarted = false;  // true once the server accepted the message
         const STREAM_TOTAL_TIMEOUT_MS = 60000;
         const STREAM_IDLE_TIMEOUT_MS = 20000;
         let totalTimer = null, idleTimer = null, reader = null;
@@ -2162,9 +2349,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: controller.signal
             });
             if (!response.ok || !response.body) { clearTimers(); throw new Error('stream_unavailable'); }
+            streamStarted = true;
             reader = response.body.getReader();
             const decoder = new TextDecoder();
             let carry = '', acc = '', finalReply = '', finalOutcome = '', shouldListen = false, gotDone = false;
+            let awaitingApproval = false;  // a tool is waiting for the user's yes: a question, not an error
             function consumeSseBlock(block) {
                 for (const line of block.split('\n')) {
                     const trimmed = line.trim();
@@ -2187,9 +2376,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (ev.type === 'done') {
                         finalReply = ev.response || ev.text || acc || '';
                         finalOutcome = ev.outcome || '';
+                        awaitingApproval = Array.isArray(ev.receipts)
+                            && ev.receipts.some((receipt) => receipt?.diagnostic_code === 'tool_confirmation_required');
                         shouldListen = !!ev.should_listen;
                         gotDone = true;
-                    } else if (ev.type === 'error') { throw new Error(ev.message || 'stream_error'); }
+                    } else if (ev.type === 'error') {
+                        const failure = new Error(ev.message || 'stream_error');
+                        failure.code = ev.code || '';
+                        throw failure;
+                    }
                 }
             }
             while (true) {
@@ -2214,11 +2409,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 outcome: finalOutcome,
                 response: cleanReply,
                 should_listen: shouldListen,
+                awaiting_approval: awaitingApproval,
             };
         } catch (error) {
             clearTimers();
             if (reader) { try { await reader.cancel(); } catch (_) { } reader = null; }
             addLogEntry(t('streaming_fail').replace('{detail}', error?.message || '---'));
+            if (activeCommand?.cancelled) {
+                return { ok: false, cancelled: true, outcome: 'cancelled', response: '', should_listen: false };
+            }
+            if (streamStarted) {
+                // The server already has this message (and may have run tools): never send it again.
+                return {
+                    ok: false,
+                    error: 'stream_interrupted',
+                    response: error?.code ? reasoningFailureReply({ message: error.code }) : t('command_failed_midway'),
+                    should_listen: false,
+                };
+            }
             addLogEntry(t('streaming_fallback'));
             try { return await getLlamaResponseClassic(userInput); }
             catch (e2) {
@@ -2240,7 +2448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         r = r.replace(/```[\s\S]*?```/g, '');
         r = r.replace(/\*\*/g, '');
         r = r.trim();
-        return r || t('boot_greetings')[0];
+        return r || t('command_empty_reply');
     }
 
     function splitForTts(text) {
@@ -2657,6 +2865,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && textCommandInFlight && cancelActiveCommand()) {
+            e.preventDefault();
+        }
         if (e.key === 'Escape' && (isSpeaking || ttsChainActive || liveVoiceIsPlaying())) {
             stopSpeaking();
         }
@@ -2676,6 +2887,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function setEmergencyStop(engage) {
         if (engage) {
+            cancelActiveCommand();
             interrumpirAudio();
             await stopLiveVoiceStream({ resumePassive: false });
         }
@@ -2778,6 +2990,7 @@ document.addEventListener('DOMContentLoaded', () => {
         select.title = `${t('mic_label')}: ${data.in_use || select.selectedOptions[0]?.textContent || ''}${data.error ? ` — ${data.error}` : ''}`;
         select.hidden = devices.length === 0;
         setPreferredMicName(select.value);
+        assistantUi?.setMic(data);
     }
 
     async function chooseMicrophone(event) {
@@ -2811,6 +3024,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const count = document.getElementById('task-count');
         if (count) count.textContent = String(lastTasks.filter((task) => !['completed', 'failed', 'cancelled'].includes(task.state)).length);
         renderTasks(document.getElementById('task-panel'), lastTasks, { t, busy: taskBusy, onAction: runTaskAction });
+        assistantUi?.setTasks(lastTasks);
     }
 
     async function refreshTasks() {
@@ -2837,6 +3051,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    assistantUi = initAssistantUi({ t, submitCommand: (text) => submitTextCommand(text), taskAction: runTaskAction });
     refreshTasks();
     setInterval(refreshTasks, 4000);
     fetchJsonWithRetry('/api/security/microphones').then(renderMicrophones).catch(() => { });

@@ -7,6 +7,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; base-uri 'self'; form-action 'self';">
     <title>J.A.R.V.I.S. | HUD Central</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.3.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}?v=1.4.0">
     <link rel="icon" type="image/svg+xml" href="/media/favicon.svg">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0a0a0a">
@@ -154,6 +155,13 @@
                 <div class="crosshair bottom-left"></div>
                 <div class="crosshair bottom-right"></div>
 
+                <div id="status-bar" class="status-bar" role="group" aria-label="JARVIS status" data-i18n-aria-label="sb_label">
+                    <span id="sb-ai" class="status-chip" data-state="unknown"><i class="chip-dot" aria-hidden="true"></i><span class="chip-key" data-i18n="sb_ai">AI</span><b id="sb-ai-text">…</b></span>
+                    <span id="sb-mode" class="status-chip" data-state="cloud"><i class="chip-dot" aria-hidden="true"></i><span class="chip-key" data-i18n="sb_mode">Mode</span><b id="sb-mode-text">-</b></span>
+                    <span id="sb-mic" class="status-chip" data-state="off"><i class="chip-dot" aria-hidden="true"></i><span class="chip-key" data-i18n="sb_mic">Mic</span><b id="sb-mic-text">…</b></span>
+                    <span id="sb-tasks" class="status-chip" data-state="off"><i class="chip-dot" aria-hidden="true"></i><span class="chip-key" data-i18n="sb_tasks">Tasks</span><b id="sb-tasks-text">0</b></span>
+                </div>
+
                 <div class="core-container">
                     <div class="arc-reactor" id="jarvis-core">
                         <canvas id="arc-canvas"></canvas>
@@ -273,9 +281,22 @@
                     <div class="conversation-header">
                         <span class="conversation-title" data-i18n="conversation_panel_title">CONVERSACIÓN</span>
                     </div>
-                    <div id="conversation-segments" class="conversation-segments custom-scrollbar">
-                        <div class="conversation-empty" data-i18n="conversation_empty">Aquí aparecerán tus conversaciones. Puedes comenzar escribiendo o activar la voz.</div>
+                    <div class="welcome-card">
+                        <div class="welcome-card-inner">
+                            <h2 class="welcome-title" data-i18n="welcome_title">Hello, I'm JARVIS</h2>
+                            <p class="welcome-sub" data-i18n="welcome_sub">Type below or press Activate voice. I can open apps, check your PC, set reminders, search the web and run multi-step tasks. I ask before anything risky.</p>
+                            <p class="welcome-hint" data-i18n="conversation_empty">Aquí aparecerán tus conversaciones. Puedes comenzar escribiendo o activar la voz.</p>
+                            <div class="suggestions" role="group" aria-label="Suggestions" data-i18n-aria-label="suggest_label">
+                                <button type="button" class="suggestion-chip" data-command="check my system health" data-i18n="suggest_health">Check my system health</button>
+                                <button type="button" class="suggestion-chip" data-command="open chrome" data-i18n="suggest_chrome">Open Chrome</button>
+                                <button type="button" class="suggestion-chip" data-command="set a 5 minute timer" data-i18n="suggest_timer">Set a 5 minute timer</button>
+                                <button type="button" class="suggestion-chip" data-command="what's the weather today?" data-i18n="suggest_weather">Weather today</button>
+                                <button type="button" class="suggestion-chip" data-command="take a screenshot" data-i18n="suggest_screenshot">Take a screenshot</button>
+                                <button type="button" class="suggestion-chip" data-command="show my tasks" data-i18n="suggest_tasks">Show my tasks</button>
+                            </div>
+                        </div>
                     </div>
+                    <div id="conversation-segments" class="conversation-segments custom-scrollbar"></div>
                 </section>
 
                 <div id="widget-container" class="widget-overlay"></div>
@@ -342,17 +363,40 @@
                     <div id="task-panel" class="task-list custom-scrollbar" aria-live="polite">
                         <div class="control-empty" data-i18n="tasks_empty">No tasks yet.</div>
                     </div>
+                    <div class="control-divider"></div>
+                    <div class="control-row control-row-title">
+                        <span class="label" data-i18n="auto_title">AUTOMATION</span>
+                    </div>
+                    <div id="automation-settings" class="automation-settings">
+                        <label class="auto-check"><input type="checkbox" id="auto-voice"><span data-i18n="auto_voice">Start listening by voice as soon as JARVIS opens</span></label>
+                        <label class="auto-check"><input type="checkbox" id="auto-low-risk"><span data-i18n="auto_low_risk">Run low-risk actions without asking</span></label>
+                        <label class="auto-check"><input type="checkbox" id="auto-once"><span data-i18n="auto_once">Ask once per task for medium-risk actions</span></label>
+                        <div class="auto-legend" data-i18n="auto_always">Always ask first for:</div>
+                        <div id="auto-always" class="auto-always"></div>
+                        <div class="auto-legend" data-i18n="auto_active">Approvals remembered right now:</div>
+                        <div id="auto-approvals" class="auto-approvals"></div>
+                        <button id="auto-revoke" class="tech-btn full-width" type="button" data-i18n="auto_revoke">Forget approvals</button>
+                        <div id="auto-status" class="auto-status" role="status" aria-live="polite"></div>
+                    </div>
                 </div>
             </div>
         </section>
 
         <footer class="bottom-controls">
             <div class="command-center-wrap">
+                <section id="approval-card" class="approval-card hidden" role="alertdialog" aria-labelledby="approval-title" aria-describedby="approval-body">
+                    <div class="approval-head"><span id="approval-title" data-i18n="approval_title">JARVIS needs your OK</span></div>
+                    <div id="approval-body" class="approval-body"></div>
+                    <div class="approval-actions">
+                        <button id="approval-approve" class="approval-btn primary" type="button" data-i18n="approval_approve">Approve</button>
+                        <button id="approval-reject" class="approval-btn" type="button" data-i18n="approval_reject">Reject</button>
+                    </div>
+                </section>
                 <form id="command-form" class="command-composer">
                     <label class="sr-only" for="command-input" data-i18n="command_label">Comando para JARVIS</label>
-                    <input id="command-input" type="text" maxlength="4000"
+                    <textarea id="command-input" rows="1" maxlength="4000" enterkeyhint="send"
                         data-i18n-placeholder="command_placeholder"
-                        placeholder="Escribe un comando para JARVIS..." autocomplete="off">
+                        placeholder="Escribe un comando para JARVIS..." autocomplete="off" spellcheck="false"></textarea>
                     <button id="command-submit" class="composer-action send-action" type="submit"
                         data-i18n-aria-label="command_send" aria-label="Enviar comando">
                         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 20V4l19 8-19 8Zm2-3 11.85-5L5 7v3.5l6 1.5-6 1.5V17Z" /></svg>
@@ -367,6 +411,11 @@
                 </form>
                 <div id="command-status" class="command-status" data-state="idle" aria-live="polite"
                     data-i18n="command_state_idle">Listo para recibir un comando</div>
+                <div id="command-notice" class="command-notice" role="status" aria-live="polite"></div>
+                <div id="command-failed" class="command-recovery hidden" role="alert">
+                    <span id="command-failed-text"></span>
+                    <button id="command-retry-text" type="button" data-i18n="command_retry">REINTENTAR</button>
+                </div>
                 <div id="command-recovery" class="command-recovery hidden" role="alert">
                     <span id="command-recovery-text"></span>
                     <button id="command-retry-voice" type="button" data-i18n="voice_retry">REINTENTAR VOZ</button>

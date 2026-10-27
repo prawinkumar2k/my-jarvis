@@ -282,6 +282,81 @@ Candidates (sizes from ollama.com, not downloaded): `qwen3.5:4b` 3.3 GB,
 It needs your approval to download (3.3 GB; 354 GB free). No other model was
 considered worthwhile without a measured benefit on this machine.
 
+## UX repair: message input, approvals, assistant UI (2026-10-27)
+
+### Message input ("Enter does not submit")
+Reproduced in real Edge against the real page (only `/api/chat*` faked). Causes found:
+1. While any request ran (a plain reply takes 5-15 s) Enter was silently ignored and
+   Send was greyed out, with no explanation: it looked like the box was dead.
+2. The composer was a single-line `<input>`, so Shift+Enter *sent* the message, and
+   Enter that accepts a word on a Tamil/CJK keyboard (IME composition) sent a half-typed word.
+3. A successful reply cleared the box even if the user had already typed the next message.
+4. After boot the focus was on the splash screen, so typing before clicking the box went nowhere.
+5. A failed stream silently re-sent the same command to a second endpoint (a tool could run
+   twice); no retry button; no way to cancel.
+6. A "may I?" answer from JARVIS was reported as a red error.
+Fixed: multi-line textarea (Enter sends, Shift+Enter is a new line, IME Enter ignored); the box
+clears on send and the text comes back on failure/cancel; while busy Enter explains why nothing
+was sent and keeps the new text; the Send button becomes STOP (also Escape and emergency STOP);
+elapsed-time progress; a Retry button; no second request once the server has the message;
+focus on the composer after boot and "type anywhere"; confirmation questions render as normal
+assistant messages. 16 browser tests (`tests/test_ui_message_submission.py`).
+
+### Approvals: ask less, ask clearly
+Before: 21 tools were all-or-nothing "needs a yes every time" (including reading a file, every
+computer-use click and keypress, every browser click, every file move, and, from an earlier change of
+mine, every clipboard read). "yes" detection matched the word anywhere ("yes but don't delete it"
+approved), had no Tamil/Thanglish, and one profile could hold only one pending question.
+After (`core/security/approval_policy.py`, `approval_language.py`):
+- Tier 1 AUTO: reading a file (now confined to the allowed folders; it could read any path, incl. `.env`),
+  locking the PC, clipboard in local-only mode.
+- Tier 2 ONE APPROVAL per task/scope: installs (per package), file changes, delete to Recycle Bin
+  (per item), browser session, mouse/keyboard control, running a saved plan, reading the clipboard when
+  the text could go to a cloud AI. The question says what one "yes" covers; later calls in the
+  scope do not ask again; scopes expire (5-30 min), end at emergency STOP and on any settings change.
+- Tier 3 EXPLICIT every time: shutdown/restart, killing processes, wiping memory, terminal, clicks/typing
+  that may submit, buy, send or sign in, password fields, risky hotkeys (Alt+F4, Win+R ...). A grant never
+  covers these. Unknown confirmation tools default here.
+- Task engine: a plan is approved once (bound to a hash of its steps, so an edited plan needs a new
+  approval); dangerous steps still ask separately; STOP withdraws plan approvals. Example in tests:
+  4-step plan = 2 questions (before: 3).
+- Replies: only a whole-message answer counts ("ok", "go ahead", "seri pannu", "sari", "pannunga";
+  "no", "vendaam", "illa"). "yes but don't", "yes and open Chrome", "ok delete everything" are not
+  approval. Any unrelated message drops the pending question, so a later "okay" cannot approve
+  something old. With several tasks waiting, nothing is guessed.
+- User settings (`/api/security/automation`, Automation panel): run low-risk actions without asking;
+  ask once per task; force "always ask" per category; list/forget remembered approvals.
+Tests: 87 (policy, language, guard, chat replies, task plans, STOP, tampering).
+
+### Privacy: local-only mode
+`JARVIS_AI_MODE=local_only` now also blocks Gemini Live voice (refused before any audio), Gemini TTS
+(local Piper used), Groq cloud transcription, screenshot analysis (nothing is captured) and Google
+Search grounding. Outside local-only mode, "analyze my screen" still uploads the screenshot to the cloud
+vision model when you ask for it, with no extra prompt (an earlier, deliberate design kept after I
+tried and reverted an approval prompt: you asked for it explicitly). Known gap: there is no per-use
+"ask before uploading my screen" setting yet.
+New `/api/security/ai-route`: configured chain (primary / Gemini backup / fallbacks), mode, which
+model actually answered last; never returns keys.
+
+### Voice on by default
+Reported: "voice only works after I switch it on; everything should be on by default". Cause: after
+boot nothing started the two-way voice (only the offline "Hey Jarvis" listener runs); it needed a
+button press. Now JARVIS starts listening by itself after the greeting (or after 25 s if the greeting
+hangs), same path as the Activate voice button: Gemini Live when available, otherwise local listening;
+never the cloud stream in local-only mode. It will not trigger a microphone permission prompt by
+itself: if Windows/WebView has not already allowed the mic it shows one line saying to press Activate
+voice once. Setting "Start listening by voice as soon as JARVIS opens" (on by default) in the
+Automation panel. Not verified on real hardware: whether your WebView already reports the microphone
+as allowed (if not, one press of Activate voice is needed once). 4 browser tests with the WebSocket
+and permission stubbed.
+
+### Assistant UI
+Layered theme (`css/assistant.css`, original `style.css` untouched): graphite surfaces, one calm cyan
+accent, no CRT scanlines / animated perspective grid / per-frame glow; conversation area is the main
+element (bubbles, was a 30%-height strip); compact presence orb; status bar (AI + who answered, mode,
+mic, open tasks, all from real endpoints, "unavailable" when missing); welcome text with suggested
+commands; approval card above the composer listing exactly what one yes covers; Automation settings.
+
 ## Phases D–I
 
 Not started.

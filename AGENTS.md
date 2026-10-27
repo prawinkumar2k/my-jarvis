@@ -145,6 +145,27 @@ node --check src\frontend\static\js\modules\recognition-policy.js
 node --check src\frontend\static\js\modules\voice-capabilities.js
 ```
 
+Approval policy (tiers, whole-message "yes", plan approval, local-only privacy):
+
+```powershell
+pytest tests\test_approval_policy.py tests\test_task_plan_approval.py tests\test_local_only_privacy.py -q
+```
+
+Browser tests of the real page (message composer, approval card, status bar, layout). They need an
+installed Edge or Chrome, serve the page without the backend and fake only `/api/*`, and take several
+minutes on a slow PC, so run them when touching `src/frontend`:
+
+```powershell
+pytest tests\test_ui_message_submission.py tests\test_ui_assistant.py -q
+node --check src\frontend\static\js\modules\assistant-ui.js
+node --check src\frontend\static\js\modules\task-panel.js
+```
+
+Approval rules to keep: a tool's `requires_confirmation` is only the baseline; how often the user is
+asked is decided in `core/security/approval_policy.py` (AUTO / once per task or scope / every time).
+Only a real user event (control panel, an accepted whole-message "yes") may create an approval,
+never model output. New cloud-facing features must check `core/cloud_policy.cloud_ai_allowed()`.
+
 Patch hygiene:
 
 ```powershell

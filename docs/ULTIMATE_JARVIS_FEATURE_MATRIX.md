@@ -51,7 +51,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Brightness | VERIFIED | Read and set on the built-in screen |
 | Screenshot | VERIFIED | Saved to Pictures\JARVIS Screenshots |
 | Screen analysis (vision) | UNVERIFIED | Enabled; uses Gemini |
-| Clipboard read/write/clear, secrets withheld, yes before reading | VERIFIED (unit) | Reading may send text to the cloud AI, so it asks first |
+| Clipboard read/write/clear, secrets withheld | VERIFIED (unit) | Reading asks once (text may reach the cloud AI); no question in local-only mode |
 | Lock / shutdown / restart with confirmation | existing | `controlar_pc` |
 | Windows Settings pages | UNVERIFIED | |
 | Wi-Fi / Bluetooth on/off | MISSING | Needs admin rights; opens Settings instead |
@@ -67,7 +67,7 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | File details (size, dates, read-only, link) | VERIFIED (unit) | Allowed folders only |
 | Install software with winget (approval, user scope) | PARTIAL | Real search and identity check; real install path stopped as already installed; installs unit-tested only |
 | Full diagnostics (GPU, disk health, battery time) | VERIFIED | Real readings; unavailable shown as unavailable |
-| Browser click/type need approval | VERIFIED (unit) | |
+| Browser click/type: one approval per session; submit/buy/send/sign-in always asks | VERIFIED (unit) | Page text is untrusted; Chromium download not needed (installed Edge works) |
 | Browser automation (navigate, type, click, read) | VERIFIED | Real: installed Edge via Playwright, local test page; no Chromium download needed |
 | Emergency STOP stops winget install and closes automation browser | VERIFIED (unit) | Does not undo actions already completed |
 | PDF / spreadsheet understanding | MISSING | |
@@ -100,6 +100,15 @@ Evidence: `pytest -q` (all passing, see TEST_REPORT.md), live checks noted below
 | Voice no longer cut by short noise / speaker echo | VERIFIED (unit) | Time-based barge-in; real-room behaviour needs your confirmation |
 | Web search without Tavily/Brave keys | VERIFIED | Real: Chennai weather with sources via Gemini Google Search grounding; blocked in local_only |
 | Task control panel (approve / reject / resume / cancel) | VERIFIED | Real Edge + backend end-to-end; backend re-checks eligibility |
+| Risk-tiered approvals (auto / once per task / always ask), user settings | VERIFIED (unit) | 87 tests; policy applies to chat, voice, browser and the task engine through one guard |
+| Plan approved once, dangerous steps still ask; edited plans need re-approval | VERIFIED (unit) | Bound to a plan hash; emergency STOP withdraws approvals |
+| "ok / seri / sari / pannu" approves, "yes but don't" does not | VERIFIED (unit) | Whole-message match; unrelated message drops the pending question |
+| Approval card above the composer (shows what one yes covers) | VERIFIED (browser, mocked backend) | Double-click sends once; task text cannot inject HTML |
+| Message composer: Enter / Shift+Enter / Send / STOP / Retry / IME | VERIFIED (browser, mocked backend) | Real Edge; the fake backend proves the front-end contract, not the AI |
+| Local-only mode blocks Gemini voice, Gemini TTS, Groq STT, screenshot upload, search grounding | VERIFIED (unit) | Proves JARVIS makes no attempt; cannot see other software |
+| Voice listens from launch (no button), never prompts for the mic itself, can be turned off | VERIFIED (browser, stubbed mic) / UNVERIFIED on your PC | Needs the mic already allowed in WebView; the real hardware path is not yet confirmed |
+| Manual AI mode (one provider, no silent fallback) | VERIFIED (unit) | `JARVIS_AI_MODE=manual` + `JARVIS_LLM_PROVIDER` |
+| Assistant UI: status bar (AI route, who answered), welcome + suggestions | VERIFIED (browser, mocked backend) | Real data only; "unavailable" when missing |
 
 ## Integrations
 

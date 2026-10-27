@@ -3,11 +3,12 @@
  */
 
 export const API = {
-    async postChat(message, profileId = 'web_default') {
+    async postChat(message, profileId = 'web_default', signal = undefined) {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, profile_id: profileId })
+            body: JSON.stringify({ message, profile_id: profileId }),
+            signal
         });
         const type = String(res.headers.get('content-type') || '').toLowerCase();
         if (!type.includes('application/json')) throw new Error('api_chat_invalid_response');

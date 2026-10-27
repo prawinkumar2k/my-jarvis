@@ -2392,3 +2392,21 @@ body::before {
 
 /* Microphone selector: device names can be very long; keep the header on one line (full name in the tooltip). */
 #mic-selector { flex: 0 1 170px; max-width: 170px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+
+
+/* Message composer: multi-line, never pushed off-screen */
+.command-composer { align-items: flex-end; }
+#command-input {
+    resize: none;
+    height: 38px;
+    min-height: 38px;
+    max-height: 150px;
+    line-height: 1.45;
+    padding: 8px 8px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+.send-action[data-mode="stop"] { border-color: var(--warning); color: var(--warning); }
+.send-action[data-mode="stop"]:hover { background: rgba(255, 60, 60, 0.15); }
+.command-notice { min-height: 1.1em; padding: 2px 10px; font-size: 0.74rem; color: var(--processing, #ffb347); }
+.command-notice:empty { display: none; }

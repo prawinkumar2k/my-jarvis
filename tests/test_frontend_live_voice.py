@@ -389,3 +389,32 @@ const degraded = liveVoice.liveVoiceErrorView({ code: 'live_audio_transport_degr
 if (degraded.terminal) process.exit(5);
 """
     )
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required for frontend checks")
+def test_barge_in_needs_sustained_speech_not_short_noise_or_echo():
+    # Real worklet frames: 128 samples at 48 kHz (~2.7 ms each).
+    _run_node_live_voice_assertions(
+        """
+let clock = 0, hits = 0;
+const d = new liveVoice.BargeInDetector({ now: () => clock });
+d.onBargeIn = () => { hits += 1; };
+const loud = new Float32Array(128).fill(0.1), quiet = new Float32Array(128).fill(0.001);
+const feed = (frame, ms) => { const n = Math.round(ms / (128 / 48)); for (let i = 0; i < n; i++) { d.processAudioFrame(frame, 48000); clock += 128 / 48; } };
+
+d.setAssistantSpeaking(true);
+feed(loud, 400);                 // speaker echo right after JARVIS starts talking
+if (hits) process.exit(1);       // ignored: onset grace period
+feed(quiet, 200);
+feed(loud, 10);                  // a cough / key click (~10 ms) used to cut the reply
+if (hits) process.exit(2);
+feed(quiet, 300);
+for (let i = 0; i < 6; i++) { feed(loud, 40); feed(quiet, 200); }   // short bursts with long gaps
+if (hits) process.exit(3);
+feed(loud, 200); feed(quiet, 60); feed(loud, 200);   // real speech with a short pause between syllables
+if (hits !== 1) process.exit(4);
+d.setAssistantSpeaking(false);
+feed(loud, 1000);
+if (hits !== 1) process.exit(5); // never while JARVIS is silent
+"""
+    )

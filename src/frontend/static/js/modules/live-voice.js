@@ -169,24 +169,53 @@ export class AudioBufferQueuePlayer {
 }
 
 export class BargeInDetector {
+    /**
+     * Local "user started talking" detector used while JARVIS is speaking.
+     *
+     * Time-based: audio worklet frames are only 128 samples (~2.7 ms at 48 kHz),
+     * so counting frames made ~8 ms of sound (a cough, a key press, or JARVIS's
+     * own voice coming back from the speaker) cut the reply off. Now it needs
+     * sustained speech (minSpeechMs) above a higher level, and ignores the first
+     * onsetGraceMs after JARVIS starts talking, when speaker echo is strongest.
+     * Gemini's server-side interruption still works independently.
+     * Passing minConsecutiveFrames keeps the old frame-count behaviour.
+     */
     constructor(options = {}) {
-        this.speechThreshold = options.speechThreshold ?? 0.025;
+        this.frameMode = options.minConsecutiveFrames !== undefined;
+        this.speechThreshold = options.speechThreshold ?? 0.04;
         this.minConsecutiveFrames = options.minConsecutiveFrames ?? 3;
+        this.minSpeechMs = options.minSpeechMs ?? 350;
+        this.maxGapMs = options.maxGapMs ?? 120;
+        this.onsetGraceMs = this.frameMode ? 0 : (options.onsetGraceMs ?? 500);
+        this.now = options.now || (() => (globalThis.performance?.now?.() ?? Date.now()));
         this.consecutiveFrames = 0;
+        this.speechMs = 0;
+        this.gapMs = 0;
+        this.speakingSince = 0;
         this.onBargeIn = null;
         this.isAssistantSpeaking = false;
     }
 
-    setAssistantSpeaking(speaking) {
-        this.isAssistantSpeaking = Boolean(speaking);
-        if (!speaking) {
-            this.consecutiveFrames = 0;
-        }
+    _reset() {
+        this.consecutiveFrames = 0;
+        this.speechMs = 0;
+        this.gapMs = 0;
     }
 
-    processAudioFrame(samples) {
+    setAssistantSpeaking(speaking) {
+        const next = Boolean(speaking);
+        if (next && !this.isAssistantSpeaking) this.speakingSince = this.now();
+        this.isAssistantSpeaking = next;
+        if (!next) this._reset();
+    }
+
+    processAudioFrame(samples, sampleRate = 48000) {
         if (!this.isAssistantSpeaking || !samples || samples.length === 0) {
-            this.consecutiveFrames = 0;
+            this._reset();
+            return;
+        }
+        if (this.onsetGraceMs && this.now() - this.speakingSince < this.onsetGraceMs) {
+            this._reset();
             return;
         }
 
@@ -195,15 +224,28 @@ export class BargeInDetector {
             sumSq += samples[i] * samples[i];
         }
         const rms = Math.sqrt(sumSq / samples.length);
+        const loud = rms >= this.speechThreshold;
 
-        if (rms >= this.speechThreshold) {
-            this.consecutiveFrames += 1;
+        if (this.frameMode) {
+            this.consecutiveFrames = loud ? this.consecutiveFrames + 1 : 0;
             if (this.consecutiveFrames >= this.minConsecutiveFrames) {
-                this.consecutiveFrames = 0;
+                this._reset();
                 this.onBargeIn?.();
             }
+            return;
+        }
+
+        const frameMs = (samples.length / Math.max(1, Number(sampleRate) || 48000)) * 1000;
+        if (loud) {
+            this.speechMs += frameMs;
+            this.gapMs = 0;
         } else {
-            this.consecutiveFrames = 0;
+            this.gapMs += frameMs;
+            if (this.gapMs > this.maxGapMs) this._reset();  // short pauses between syllables are fine
+        }
+        if (this.speechMs >= this.minSpeechMs) {
+            this._reset();
+            this.onBargeIn?.();
         }
     }
 }
@@ -509,7 +551,7 @@ export class LiveVoiceClient {
             }
             await this.capture.start({
                 onChunk: chunk => this._sendBinary(chunk),
-                onFrame: frame => this.bargeInDetector.processAudioFrame(frame),
+                onFrame: frame => this.bargeInDetector.processAudioFrame(frame, this.capture.audioContext?.sampleRate),
                 onDegraded: code => this.onDiagnostics?.({ code }),
             });
             this.audioCtx = this.capture.audioContext;

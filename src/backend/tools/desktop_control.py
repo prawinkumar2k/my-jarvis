@@ -59,6 +59,14 @@ def _find_window(identifier: str, windows: list[dict[str, Any]] | None = None) -
     for window in snapshot:
         if needle_lower in str(window.get("title", "")).lower():
             return window
+    # Spoken names often split or join words ("Anti Gravity" vs "Antigravity IDE",
+    # "VS code" vs "VSCode"): compare letters and digits only.
+    squashed = "".join(ch for ch in needle_lower if ch.isalnum())
+    if len(squashed) >= 3:
+        for window in snapshot:
+            title = "".join(ch for ch in str(window.get("title", "")).lower() if ch.isalnum())
+            if squashed in title:
+                return window
     return None
 
 

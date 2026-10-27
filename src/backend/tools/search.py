@@ -185,15 +185,79 @@ def _buscar_en_brave(query: str) -> str:
 _buscar_en_internet_api = _buscar_en_brave
 
 
+def _buscar_con_gemini(query: str) -> str:
+    """Google Search through Gemini grounding (official API, uses the existing Gemini key).
+
+    Returns "" when unavailable (no key, local_only mode, quota). Sources are listed so
+    the answer can be checked. Never used in local_only mode: the query would leave the PC.
+    """
+    import json
+    import os
+    import urllib.error
+    import urllib.request
+
+    from core.llm_providers import gemini_backup_model, resolve_gemini_api_key, resolve_llm_provider_config
+
+    if str(os.getenv("JARVIS_AI_MODE") or "").strip().lower() == "local_only":
+        return ""
+    key = resolve_gemini_api_key()
+    if not key:
+        return ""
+    config = resolve_llm_provider_config()
+    models = [os.getenv("JARVIS_GEMINI_MODEL") or "gemini-2.5-flash"]
+    backup = gemini_backup_model(config) if config.primary_provider == "gemini" else ""
+    if backup:
+        models.append(backup)
+    body = json.dumps({
+        "contents": [{"parts": [{"text": f"Search the web and answer briefly with current facts: {query}"}]}],
+        "tools": [{"google_search": {}}],
+    }).encode()
+    for model in models:
+        request = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            data=body,
+            headers={"Content-Type": "application/json", "x-goog-api-key": key},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:  # noqa: S310 - fixed https host
+                data = json.load(response)
+        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+            print(f"  [GEMINI SEARCH] {model} unavailable: {type(exc).__name__}")
+            continue
+        candidate = (data.get("candidates") or [{}])[0]
+        text = "".join(part.get("text", "") for part in (candidate.get("content") or {}).get("parts") or []).strip()
+        if not text:
+            continue
+        chunks = (candidate.get("groundingMetadata") or {}).get("groundingChunks") or []
+        sources = [c.get("web", {}).get("title") for c in chunks if c.get("web", {}).get("title")]
+        tail = f"\nSources: {', '.join(dict.fromkeys(sources))}" if sources else "\n(No web sources were returned.)"
+        return f"{text}{tail}"
+    return ""
+
+
 def _buscar_en_internet_impl(query: str) -> str:
-    """Implementación unificada: Tavily (primario) → Brave (fallback)."""
+    """Implementación unificada: Tavily (primario) → Brave → Google Search vía Gemini."""
     # 1. Tavily (más inteligente, respuesta con AI)
     tavily_result = _buscar_en_tavily(query)
     if tavily_result:
         return tavily_result
 
-    # 2. Brave fallback
-    return _buscar_en_brave(query)
+    # 2. Brave (only when a key is configured)
+    from core.jarvis_config import BRAVE_API_KEY
+
+    if BRAVE_API_KEY:
+        brave = _buscar_en_brave(query)
+        if brave and not brave.startswith("I could not"):
+            return brave
+
+    # 3. Google Search grounding with the Gemini key JARVIS already has
+    gemini = _buscar_con_gemini(query)
+    if gemini:
+        return gemini
+    if BRAVE_API_KEY:
+        return brave
+    return ("I could not search the web: no search service is available right now "
+            "(no Tavily/Brave key, and Gemini search was unavailable or JARVIS is in local-only mode).")
 
 
 # ─────────────────────────────────────────

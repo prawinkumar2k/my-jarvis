@@ -20,6 +20,8 @@ apscheduler>=3.10,<4
 # Browser automation, vision, and optional search provider
 playwright>=1.40,<2
 Pillow>=10,<13
+# System-tray icon for the desktop shell
+pystray>=0.19,<1; sys_platform == "win32"
 tavily-python>=0.5,<1
 
 # Windows-only controls and temperature telemetry

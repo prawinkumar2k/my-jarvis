@@ -17,6 +17,9 @@ import { classifyVoiceApiFailure } from './modules/voice-api.js';
 import { audioConstraints, setPreferredMicName } from './modules/mic-preference.js';
 import { renderTasks } from './modules/task-panel.js';
 import { initAssistantUi } from './modules/assistant-ui.js';
+import { initMemoryPanel } from './modules/memory-panel.js';
+import { initRoutinesPanel } from './modules/routines-panel.js';
+import { initSetupPanel } from './modules/setup-panel.js';
 import {
     LiveVoiceClient,
     liveVoiceErrorView,
@@ -3052,6 +3055,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     assistantUi = initAssistantUi({ t, submitCommand: (text) => submitTextCommand(text), taskAction: runTaskAction });
+    initMemoryPanel({ t });
+    initRoutinesPanel({ t });
+    initSetupPanel({ t });
     refreshTasks();
     setInterval(refreshTasks, 4000);
     fetchJsonWithRetry('/api/security/microphones').then(renderMicrophones).catch(() => { });

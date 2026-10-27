@@ -365,6 +365,15 @@
                     </div>
                     <div class="control-divider"></div>
                     <div class="control-row control-row-title">
+                        <span class="label" data-i18n="sc_title">SETUP CHECK</span>
+                        <button id="sc-run" class="mem-btn" type="button" data-i18n="sc_run">Run check</button>
+                    </div>
+                    <div class="memory-panel">
+                        <div id="sc-summary" class="auto-status" role="status" aria-live="polite"></div>
+                        <ul id="sc-list" class="sc-list"></ul>
+                    </div>
+                    <div class="control-divider"></div>
+                    <div class="control-row control-row-title">
                         <span class="label" data-i18n="auto_title">AUTOMATION</span>
                     </div>
                     <div id="automation-settings" class="automation-settings">
@@ -377,6 +386,47 @@
                         <div id="auto-approvals" class="auto-approvals"></div>
                         <button id="auto-revoke" class="tech-btn full-width" type="button" data-i18n="auto_revoke">Forget approvals</button>
                         <div id="auto-status" class="auto-status" role="status" aria-live="polite"></div>
+                    </div>
+                    <div class="control-divider"></div>
+                    <div class="control-row control-row-title">
+                        <span class="label" data-i18n="rt_title">ROUTINES</span>
+                        <strong id="rt-count" class="glow-text">0</strong>
+                    </div>
+                    <div id="routines-panel" class="memory-panel">
+                        <ul id="rt-list" class="mem-list custom-scrollbar"></ul>
+                        <div class="rt-form">
+                            <input id="rt-name" type="text" class="mem-input" maxlength="60" value="Daily summary" aria-label="Routine name">
+                            <input id="rt-time" type="time" class="mem-input" value="08:00" aria-label="Time">
+                            <select id="rt-repeat" class="mem-input" aria-label="Repeat">
+                                <option value="daily" data-i18n="rt_repeat_daily">every day</option>
+                                <option value="weekdays" data-i18n="rt_repeat_weekdays">weekdays</option>
+                                <option value="weekly" data-i18n="rt_repeat_weekly">every week</option>
+                                <option value="once" data-i18n="rt_repeat_once">once</option>
+                            </select>
+                            <select id="rt-tool" class="mem-input" aria-label="What to run"></select>
+                            <button id="rt-add" class="mem-btn" type="button" data-i18n="rt_add">Add routine</button>
+                        </div>
+                        <ul id="rt-last" class="rt-last"></ul>
+                        <div id="rt-status" class="auto-status" role="status" aria-live="polite"></div>
+                    </div>
+                    <div class="control-divider"></div>
+                    <div class="control-row control-row-title">
+                        <span class="label" data-i18n="mem_title">MEMORY</span>
+                        <strong id="mem-count" class="glow-text">0</strong>
+                    </div>
+                    <div id="memory-panel" class="memory-panel">
+                        <label class="auto-check"><input type="checkbox" id="mem-private"><span data-i18n="mem_private">Private mode: save nothing new</span></label>
+                        <input id="mem-search" type="search" class="mem-input" maxlength="80" data-i18n-placeholder="mem_search" placeholder="Search memories" autocomplete="off">
+                        <ul id="mem-list" class="mem-list custom-scrollbar"></ul>
+                        <div class="mem-add">
+                            <input id="mem-new" type="text" class="mem-input" maxlength="500" data-i18n-placeholder="mem_new" placeholder="Add something to remember" autocomplete="off">
+                            <button id="mem-add" class="mem-btn" type="button" data-i18n="mem_add">Add</button>
+                        </div>
+                        <div class="mem-actions">
+                            <button id="mem-export" class="tech-btn" type="button" data-i18n="mem_export">Export</button>
+                            <button id="mem-clear" class="tech-btn" type="button" data-i18n="mem_clear">Forget all</button>
+                        </div>
+                        <div id="mem-status" class="auto-status" role="status" aria-live="polite"></div>
                     </div>
                 </div>
             </div>

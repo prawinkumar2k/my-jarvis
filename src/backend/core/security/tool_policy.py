@@ -96,6 +96,11 @@ DEFAULT_TOOL_POLICIES: dict[str, ToolPolicy] = {
     "leer_portapapeles": ToolPolicy("leer_portapapeles", "critical", ("admin",), True, True),
     "limpiar_portapapeles": ToolPolicy("limpiar_portapapeles", "elevated", ("admin",), False, True),
     # Software: searching is read-only; installing always needs explicit approval.
+    "leer_texto_pantalla": ToolPolicy("leer_texto_pantalla", "elevated", ("admin",), False, True),
+    "leer_texto_imagen": ToolPolicy("leer_texto_imagen", "elevated", ("admin",), False, True),
+    "programar_rutina": ToolPolicy("programar_rutina", "elevated", ("admin",), False, True),
+    "ver_rutinas": ToolPolicy("ver_rutinas", "elevated", ("admin",), False, True),
+    "cancelar_rutina": ToolPolicy("cancelar_rutina", "elevated", ("admin",), False, True),
     "recordatorio_recurrente": ToolPolicy("recordatorio_recurrente", "elevated", ("admin",), False, True),
     "diagnostico_sistema": ToolPolicy("diagnostico_sistema", "elevated", ("admin",), False, True),
     "buscar_programa": ToolPolicy("buscar_programa", "elevated", ("admin",), False, True),

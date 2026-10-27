@@ -350,8 +350,16 @@ def start_app():
             confirm_close=True
         )
 
+        tray_holder = [None]
+
         def on_closed():
             print("[SYSTEM] Closing application...")
+            try:
+                from core.tray import stop_tray
+
+                stop_tray(tray_holder[0])
+            except Exception:
+                pass
             proc, backend_holder[0] = backend_holder[0], None  # stop the watchdog first
             stop_process_tree(proc)
             cleanup_temporary_storage()
@@ -394,8 +402,27 @@ def start_app():
             webbrowser.open(url)
             return False
 
+        def open_from_tray():
+            try:
+                window.restore()
+                window.show()
+            except Exception as exc:
+                print(f"[WARN] Could not show the window: {type(exc).__name__}", flush=True)
+
+        def quit_from_tray():
+            try:
+                window.destroy()
+            except Exception:
+                on_closed()
+
         def wait_for_core():
             """Runs after the window opens: wait for the core, then show the real UI."""
+            try:
+                from core.tray import start_tray
+
+                tray_holder[0] = start_tray(Path(root_dir), open_from_tray, quit_from_tray)
+            except Exception as exc:
+                print(f"[WARN] Tray icon unavailable: {type(exc).__name__}", flush=True)
             proc = backend_holder[0]
             if proc is None:
                 ensure_ui_loaded()

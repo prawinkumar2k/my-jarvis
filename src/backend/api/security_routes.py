@@ -249,12 +249,66 @@ async def _recover_tasks():
         print(f"[WARN tasks] recovery failed: {type(exc).__name__}")
 
 
+async def _routine_loop(interval: float = 30.0) -> None:
+    """Run due routines (daily summary ...) and show each result as a Windows notification."""
+    from core import routines
+    from core.notifications import show_toast
+
+    while True:
+        try:
+            for result in await asyncio.to_thread(routines.run_due):
+                title = f"JARVIS: {result['name']}" + (" (missed while JARVIS was closed)" if result.get("missed") else "")
+                body = result["text"] if result["ok"] else f"Could not run: {result['text']}"
+                await asyncio.to_thread(show_toast, title, body[:240])
+        except Exception as exc:
+            print(f"[WARN routines] loop: {type(exc).__name__}")
+        await asyncio.sleep(interval)
+
+
+@security_bp.route("/api/security/routines", methods=["GET", "POST"])
+async def routines_api():
+    """List routines and recent results (GET), or create one (POST name, time, repeat, tool, args)."""
+    from core import routines
+
+    if request.method == "POST":
+        data = await request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Send a JSON object."}), 400
+        try:
+            routine = await asyncio.to_thread(
+                routines.add, data.get("name"), data.get("time"), str(data.get("repeat") or "daily"),
+                str(data.get("tool") or ""), data.get("args") if isinstance(data.get("args"), dict) else {})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"routine": routine, **routines.list_all(), "tools": list(routines.SUGGESTED_TOOLS)}), 201
+    return jsonify({**await asyncio.to_thread(routines.list_all), "tools": list(routines.SUGGESTED_TOOLS)})
+
+
+@security_bp.route("/api/security/routines/<routine_id>/<action>", methods=["POST"])
+async def routine_action(routine_id: str, action: str):
+    """delete a routine, or run it now (a manual run does not use up the next scheduled one)."""
+    from core import routines
+
+    if action == "delete":
+        removed = await asyncio.to_thread(routines.remove, routine_id)
+        if removed is None:
+            return jsonify({"error": "No such routine."}), 404
+    elif action == "run":
+        if not any(r["id"] == routine_id for r in routines.list_all()["routines"]):
+            return jsonify({"error": "No such routine."}), 404
+        await asyncio.to_thread(routines.run_due, None, force_id=routine_id)
+    else:
+        return jsonify({"error": "Unknown action."}), 400
+    return jsonify({**await asyncio.to_thread(routines.list_all), "tools": list(routines.SUGGESTED_TOOLS)})
+
+
 @security_bp.before_app_serving
 async def _start_reminder_notifications():
     import os
 
     if os.getenv("JARVIS_TEST_MODE") != "1":
         _background_tasks.add(asyncio.create_task(_reminder_notification_loop()))
+        _background_tasks.add(asyncio.create_task(_routine_loop()))
 
 
 @security_bp.before_app_serving
@@ -302,6 +356,101 @@ async def wakeword():
     except ValueError:
         since = 0
     return jsonify(wake_word_listener.status(since))
+
+
+def _memory_view(profile_id: str | None, query: str = "") -> dict:
+    from core import memory_admin
+    from core.privacy import is_private_mode
+
+    facts = memory_admin.list_facts(profile_id, query)
+    return {"facts": facts, "count": len(memory_admin.list_facts(profile_id)), "private_mode": is_private_mode()}
+
+
+@security_bp.route("/api/security/memory", methods=["GET", "POST"])
+async def memory_facts():
+    """List/search (GET ?q=&profile_id=) or add (POST {"text"}) saved memories. Secrets are refused
+    and nothing is saved in private mode (same rules as telling JARVIS directly)."""
+    from core import memory_admin
+
+    profile_id = request.args.get("profile_id") or None
+    if request.method == "POST":
+        data = await request.get_json(silent=True)
+        text = str((data or {}).get("text") or "").strip() if isinstance(data, dict) else ""
+        if not text or len(text) > 500:
+            return jsonify({"error": "Send a memory of 1 to 500 characters."}), 400
+        ok, message = await asyncio.to_thread(memory_admin.add_fact, profile_id, text)
+        view = await asyncio.to_thread(_memory_view, profile_id)
+        return jsonify({**view, "ok": ok, "message": message}), (200 if ok else 409)
+    view = await asyncio.to_thread(_memory_view, profile_id, request.args.get("q", ""))
+    return jsonify(view)
+
+
+@security_bp.route("/api/security/memory/<int:number>/<action>", methods=["POST"])
+async def memory_fact_action(number: int, action: str):
+    """edit ({"text"}) or delete one saved memory by its number."""
+    from core import memory_admin
+
+    profile_id = request.args.get("profile_id") or None
+    if action == "delete":
+        ok, message = await asyncio.to_thread(memory_admin.forget_fact, profile_id, number)
+    elif action == "edit":
+        data = await request.get_json(silent=True)
+        text = str((data or {}).get("text") or "").strip() if isinstance(data, dict) else ""
+        if not text or len(text) > 500:
+            return jsonify({"error": "Send the new memory text (1 to 500 characters)."}), 400
+        ok, message = await asyncio.to_thread(memory_admin.edit_fact, profile_id, number, text)
+    else:
+        return jsonify({"error": "Unknown action."}), 400
+    view = await asyncio.to_thread(_memory_view, profile_id)
+    return jsonify({**view, "ok": ok, "message": message}), (200 if ok else 409)
+
+
+@security_bp.route("/api/security/memory/export", methods=["GET"])
+async def memory_export():
+    """Download everything JARVIS remembers as a JSON file."""
+    import json
+
+    from core import memory_admin
+
+    payload = await asyncio.to_thread(memory_admin.export_facts, request.args.get("profile_id") or None)
+    return (
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        200,
+        {"Content-Type": "application/json; charset=utf-8",
+         "Content-Disposition": 'attachment; filename="jarvis-memory.json"', "Cache-Control": "no-store"},
+    )
+
+
+@security_bp.route("/api/security/memory/private", methods=["POST"])
+async def memory_private_mode():
+    """Private mode: while on, nothing new is saved to long-term memory (kept across restarts)."""
+    from core.privacy import set_private_mode
+
+    data = await request.get_json(silent=True)
+    enabled = (data or {}).get("enabled") if isinstance(data, dict) else None
+    if not isinstance(enabled, bool):
+        return jsonify({"error": "Field 'enabled' must be true or false."}), 400
+    return jsonify({"private_mode": set_private_mode(enabled)})
+
+
+@security_bp.route("/api/security/memory/clear", methods=["POST"])
+async def memory_clear():
+    """Forget every saved memory. Needs {"confirm": "DELETE ALL"} so it cannot happen by accident."""
+    from core import memory_admin
+
+    data = await request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("confirm") != "DELETE ALL":
+        return jsonify({"error": "Send {\"confirm\": \"DELETE ALL\"} to forget every memory."}), 400
+    removed = await asyncio.to_thread(memory_admin.clear_all, request.args.get("profile_id") or None)
+    return jsonify({"removed": removed, **await asyncio.to_thread(_memory_view, request.args.get("profile_id") or None)})
+
+
+@security_bp.route("/api/security/setup-check", methods=["GET"])
+async def setup_check():
+    """Read-only health check: AI, local model, microphone, speech, voice, FFmpeg, browser, startup."""
+    from core import setup_check as checks
+
+    return jsonify(await asyncio.to_thread(checks.run_checks))
 
 
 @security_bp.route("/api/security/ai-route", methods=["GET"])

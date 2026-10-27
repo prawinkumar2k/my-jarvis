@@ -13,7 +13,27 @@ import re
 import threading
 
 _lock = threading.RLock()
-_private_mode = str(os.getenv("JARVIS_PRIVATE_MODE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _state_file():
+    from core.runtime_paths import resolve_runtime_paths
+
+    return resolve_runtime_paths().memory / "private_mode.json"
+
+
+def _initial_private_mode() -> bool:
+    """The environment switch, or what the user chose last time (kept across restarts)."""
+    if str(os.getenv("JARVIS_PRIVATE_MODE") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    try:
+        import json
+
+        return bool(json.loads(_state_file().read_text(encoding="utf-8")).get("enabled"))
+    except (OSError, ValueError):
+        return False
+
+
+_private_mode = _initial_private_mode()
 
 _SENSITIVE_PATTERNS = (
     re.compile(r"\b(?:AIza[0-9A-Za-z_-]{20,}|gsk_[0-9A-Za-z]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[0-9A-Za-z]{20,}|xox[abpr]-[0-9A-Za-z-]{10,})"),
@@ -33,6 +53,14 @@ def set_private_mode(enabled: bool) -> bool:
     global _private_mode
     with _lock:
         _private_mode = bool(enabled)
+        try:
+            import json
+
+            path = _state_file()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"enabled": _private_mode}), encoding="utf-8")
+        except OSError:
+            pass  # the in-memory switch still applies for this session
         return _private_mode
 
 
